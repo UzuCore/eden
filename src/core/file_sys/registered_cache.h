@@ -309,7 +309,7 @@ public:
 private:
     void ScanDirectory(const VirtualDir& dir);
     void ProcessNSP(const VirtualFile& file);
-	void ProcessNSZ(const VirtualFile& file);
+    void ProcessNSZ(const VirtualFile& file);
     void ProcessXCI(const VirtualFile& file);
 
     std::vector<VirtualDir> load_dirs;
