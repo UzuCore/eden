@@ -24,6 +24,7 @@
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/submission_package.h"
 #include "core/file_sys/vfs/vfs_concat.h"
+#include "core/file_sys/vfs/vfs_ncz.h"
 #include "core/loader/loader.h"
 
 namespace FileSys {
@@ -1357,6 +1358,8 @@ void ExternalContentProvider::ScanDirectory(const VirtualDir& dir) {
 
         if (extension == "nsp") {
             ProcessNSP(file);
+        } else if (extension == "nsz") {
+            ProcessNSZ(file);
         } else if (extension == "xci") {
             ProcessXCI(file);
         }
@@ -1375,6 +1378,28 @@ void ExternalContentProvider::ProcessNSP(const VirtualFile& file) {
 
     LOG_DEBUG(Service_FS, "Processing NSP file: {}", file->GetName());
     AddExternalEntriesFromContainer(nsp, entries, versions, multi_version_entries);
+}
+
+void ExternalContentProvider::ProcessNSZ(const VirtualFile& file) {
+    const auto nca_file = FileSys::WrapNszAsNca(file);
+    if (!nca_file) {
+        LOG_WARNING(Service_FS, "Failed to wrap NSZ as NCA: {}", file->GetName());
+        return;
+    }
+
+    const auto nca = std::make_shared<NCA>(nca_file);
+    if (nca->GetStatus() != Loader::ResultStatus::Success &&
+        nca->GetStatus() != Loader::ResultStatus::ErrorMissingBKTRBaseRomFS) {
+        LOG_WARNING(Service_FS, "NSZ NCA parse failed: {} (status={})",
+                    file->GetName(), static_cast<int>(nca->GetStatus()));
+        return;
+    }
+ 
+    LOG_INFO(Service_FS, "Registered NSZ: {} (title_id={:016X})",
+             file->GetName(), nca->GetTitleId());
+ 
+    const auto content_type = GetCRTypeFromNCAType(nca->GetType());
+    entries[{nca->GetTitleId(), content_type, TitleType::Application}] = nca_file;
 }
 
 void ExternalContentProvider::ProcessXCI(const VirtualFile& file) {

@@ -18,6 +18,7 @@
 #include "core/file_sys/program_metadata.h"
 #include "core/file_sys/submission_package.h"
 #include "core/loader/loader.h"
+#include "core/file_sys/vfs/vfs_ncz.h"
 
 namespace FileSys {
 
@@ -242,6 +243,18 @@ void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
             for (const auto& rec : cnmt.GetContentRecords()) {
                 const auto id_string = Common::HexToString(rec.nca_id, false);
                 auto next_file = pfs->GetFile(fmt::format("{}.nca", id_string));
+
+                if (next_file == nullptr) {
+                    auto ncz_file = pfs->GetFile(fmt::format("{}.ncz", id_string));
+                    if (ncz_file != nullptr) {
+                        next_file = WrapNszAsNca(std::move(ncz_file));
+                        if (next_file == nullptr) {
+                            LOG_ERROR(Service_FS, "NSZ: Failed to load {}.ncz - unsupported format",
+                                      id_string);
+                            continue;
+                        }
+                    }
+                }
 
                 if (next_file == nullptr) {
                     if (rec.type != ContentRecordType::DeltaFragment) {
