@@ -1,4 +1,4 @@
-@echo off
+echo off
 chcp 65001 > nul
  
 set SOURCE_DIR=D:\NSW.dev\eden
@@ -15,9 +15,13 @@ echo [1/3] MSVC 환경 로드...
 powershell -ExecutionPolicy Bypass -File "%SOURCE_DIR%\tools\windows\load-msvc-env.ps1"
 if %errorlevel% neq 0 ( echo 실패 & pause & exit /b 1 )
  
-echo [2/3] CMake 구성...
-cmake -S "%SOURCE_DIR%" -B "%SOURCE_DIR%\build" -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DYUZU_TESTS=OFF -DYUZU_USE_BUNDLED_QT=ON -DYUZU_USE_CPM=ON -DENABLE_LTO=ON -DYUZU_CMD=OFF -DYUZU_ROOM=ON -DYUZU_USE_BUNDLED_FFMPEG=ON
-if %errorlevel% neq 0 ( echo 실패 & pause & exit /b 1 )
+if not exist "%SOURCE_DIR%\build" (
+    echo [2/3] CMake 구성 중...
+    cmake -S "%SOURCE_DIR%" -B "%SOURCE_DIR%\build" -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DYUZU_TESTS=OFF -DYUZU_USE_BUNDLED_QT=ON -DYUZU_USE_CPM=ON -DENABLE_LTO=ON -DYUZU_CMD=OFF -DYUZU_ROOM=ON -DYUZU_USE_BUNDLED_FFMPEG=ON
+    if %errorlevel% neq 0 ( echo 실패 & pause & exit /b 1 )
+) else (
+    echo [2/3] CMake 구성 생략 (build 폴더 존재)
+)
  
 echo [3/3] 빌드...
 cmake --build "%SOURCE_DIR%\build" --config Release --parallel
