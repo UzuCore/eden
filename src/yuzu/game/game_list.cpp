@@ -1115,7 +1115,8 @@ void GameList::LoadInterfaceLayout() {
 
 const QStringList GameList::supported_file_extensions = {
     QStringLiteral("nso"), QStringLiteral("nro"), QStringLiteral("nca"),
-    QStringLiteral("xci"), QStringLiteral("nsp"), QStringLiteral("kip")};
+    QStringLiteral("xci"), QStringLiteral("xcz"),
+    QStringLiteral("nsp"), QStringLiteral("nsz"), QStringLiteral("kip")};
 
 void GameList::RefreshGameDirectory() {
     // Reset the externals watcher whenever the game list is reloaded,

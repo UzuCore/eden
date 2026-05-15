@@ -178,6 +178,8 @@ add_library(core STATIC
     file_sys/vfs/vfs_types.h
     file_sys/vfs/vfs_vector.cpp
     file_sys/vfs/vfs_vector.h
+    file_sys/vfs/vfs_ncz.cpp
+    file_sys/vfs/vfs_ncz.h
     file_sys/xts_archive.cpp
     file_sys/xts_archive.h
     frontend/applets/cabinet.cpp
