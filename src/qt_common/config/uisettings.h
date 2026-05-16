@@ -172,7 +172,7 @@ struct Values {
     bool game_dir_deprecated_deepscan;
     QVector<GameDir> game_dirs;
     QStringList recent_files;
-    Setting<std::string> language{linkage, {"ko"}, "language", Category::Paths};
+    Setting<std::string> language{linkage, {"ko_KR"}, "language", Category::Paths};
 
     std::string theme;
 
