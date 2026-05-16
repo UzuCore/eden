@@ -64,3 +64,6 @@ artifacts
 /install*
 vulkansdk*.exe
 *.tar.zst
+
+eden.keystore
+release/
