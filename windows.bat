@@ -1,4 +1,4 @@
-echo off
+@echo off
 chcp 65001 > nul
  
 set SOURCE_DIR=D:\NSW.dev\eden

@@ -19,7 +19,7 @@ if (DEFINED GIT_RELEASE)
     set(GIT_REFSPEC "${GIT_RELEASE}")
     set(IS_DEV_BUILD false)
 else()
-    string(TIMESTAMP BUILD_VERSION "%y%m%d" UTC)
+    string(TIMESTAMP BUILD_VERSION "%y%m%d%H%M" UTC)
     set(IS_DEV_BUILD true)
 endif()
 
