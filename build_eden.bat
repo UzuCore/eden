@@ -4,8 +4,17 @@ chcp 65001 > nul
 set SOURCE_DIR=D:\NSW.dev\eden
 set BIN_DIR=%SOURCE_DIR%\build\bin\Release
 set RELEASE_DIR=%SOURCE_DIR%\release
+set SEVENZIP=C:\Program Files\7-Zip\7z.exe
 set "PATH=C:\Program Files\CMake\bin;%PATH%"
 for /d %%i in ("C:\VulkanSDK\*") do set "PATH=%%i\Bin;%PATH%"
+
+if not exist "%SEVENZIP%" (
+    echo 7-Zip not found at:
+    echo   %SEVENZIP%
+    echo Please install 7-Zip or edit SEVENZIP path in this script.
+    pause
+    exit /b 1
+)
 
 set /p CLEAN=Clean build? (y/N): 
 if /i "%CLEAN%"=="Y" (
@@ -33,7 +42,10 @@ echo [4/4] Copying and zipping...
 for /f "tokens=2 delims==" %%i in ('wmic os get LocalDateTime /value') do set DATETIME=%%i
 set DATE=%DATETIME:~2,6%
 
+set ZIP_FILE=%RELEASE_DIR%\eden_windows_%DATE%.zip
+
 if not exist "%RELEASE_DIR%" mkdir "%RELEASE_DIR%"
+if exist "%ZIP_FILE%" del /q "%ZIP_FILE%"
 
 copy "%BIN_DIR%\eden.exe" "%RELEASE_DIR%\eden.exe"
 if %errorlevel% neq 0 ( echo Copy FAILED & pause & exit /b 1 )
@@ -41,9 +53,9 @@ if %errorlevel% neq 0 ( echo Copy FAILED & pause & exit /b 1 )
 copy "%BIN_DIR%\eden-room.exe" "%RELEASE_DIR%\eden-room.exe"
 if %errorlevel% neq 0 ( echo Copy FAILED & pause & exit /b 1 )
 
-powershell -Command "Compress-Archive -Path '%RELEASE_DIR%\eden.exe','%RELEASE_DIR%\eden-room.exe' -DestinationPath '%RELEASE_DIR%\eden_windows_%DATE%.zip' -Force"
+"%SEVENZIP%" a -tzip -mx9 "%ZIP_FILE%" "%RELEASE_DIR%\eden.exe" "%RELEASE_DIR%\eden-room.exe" > nul
 if %errorlevel% neq 0 ( echo ZIP FAILED & pause & exit /b 1 )
 
 echo.
-echo Done: %RELEASE_DIR%\eden_windows_%DATE%.zip
+echo Done: %ZIP_FILE%
 pause
