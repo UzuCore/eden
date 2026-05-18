@@ -7,7 +7,7 @@
 add_subdirectory(host_shaders)
 add_subdirectory(gpu_logging)
 
-if(LIBVA_FOUND)
+if(LIBVA_FOUND AND NOT ANDROID)
     set_source_files_properties(host1x/ffmpeg.cpp
         PROPERTIES COMPILE_DEFINITIONS LIBVA_FOUND=1)
     list(APPEND FFmpeg_LIBRARIES ${LIBVA_LIBRARIES})

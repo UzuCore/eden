@@ -13,7 +13,7 @@
 #include "video_core/memory_manager.h"
 
 extern "C" {
-#ifdef LIBVA_FOUND
+#if defined(LIBVA_FOUND) && !defined(__ANDROID__)
 // for querying VAAPI driver information
 #include <libavutil/hwcontext_vaapi.h>
 #endif
@@ -188,7 +188,7 @@ bool HardwareContext::InitializeWithType(AVHWDeviceType type) {
         return false;
     }
 
-#ifdef LIBVA_FOUND
+#if defined(LIBVA_FOUND) && !defined(__ANDROID__)
     if (type == AV_HWDEVICE_TYPE_VAAPI) {
         // We need to determine if this is an impersonated VAAPI driver.
         auto* hwctx = reinterpret_cast<AVHWDeviceContext*>(m_gpu_decoder->data);

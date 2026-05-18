@@ -39,8 +39,7 @@ cmake --build "%SOURCE_DIR%\build" --config Release --parallel 4
 if %errorlevel% neq 0 ( echo FAILED & pause & exit /b 1 )
 
 echo [4/4] Copying and zipping...
-for /f "tokens=2 delims==" %%i in ('wmic os get LocalDateTime /value') do set DATETIME=%%i
-set DATE=%DATETIME:~2,6%
+for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyMMdd"') do set DATE=%%i
 
 set ZIP_FILE=%RELEASE_DIR%\eden_windows_%DATE%.zip
 
@@ -53,7 +52,7 @@ if %errorlevel% neq 0 ( echo Copy FAILED & pause & exit /b 1 )
 copy "%BIN_DIR%\eden-room.exe" "%RELEASE_DIR%\eden-room.exe"
 if %errorlevel% neq 0 ( echo Copy FAILED & pause & exit /b 1 )
 
-"%SEVENZIP%" a -tzip -mx9 "%ZIP_FILE%" "%RELEASE_DIR%\eden.exe" "%RELEASE_DIR%\eden-room.exe" > nul
+"%SEVENZIP%" a -tzip -mx10 "%ZIP_FILE%" "%RELEASE_DIR%\eden.exe" "%RELEASE_DIR%\eden-room.exe" > nul
 if %errorlevel% neq 0 ( echo ZIP FAILED & pause & exit /b 1 )
 
 echo.
