@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 > nul
 
-set SOURCE_DIR=D:\NSW.dev\eden
+set SOURCE_DIR=D:\Github\eden
 set BIN_DIR=%SOURCE_DIR%\build\bin\Release
 set RELEASE_DIR=%SOURCE_DIR%\release
 set SEVENZIP=C:\Program Files\7-Zip\7z.exe

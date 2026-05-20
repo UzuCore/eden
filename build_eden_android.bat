@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 > nul
 
-set SOURCE_DIR=D:\NSW.dev\eden
+set SOURCE_DIR=D:\Github\eden
 set ANDROID_DIR=%SOURCE_DIR%\src\android
 set RELEASE_DIR=%SOURCE_DIR%\release
 set "JAVA_HOME=C:\Program Files\Microsoft\jdk-17.0.19.10-hotspot"
@@ -29,12 +29,11 @@ cd /d "%ANDROID_DIR%"
 
 if "%FLAVOR%"=="4" (
     echo [2/3] Building all flavors...
-    call gradlew.bat assembleRelease
+    call gradlew.bat assembleRelease --no-daemon
     if %errorlevel% neq 0 ( echo FAILED & goto :end )
 
     echo [3/3] Copying APKs...
-    for /f "tokens=2 delims==" %%i in ('wmic os get LocalDateTime /value') do set DATETIME=%%i
-    set DATE=%DATETIME:~2,6%
+    for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyMMdd"') do set DATE=%%i
     if not exist "%RELEASE_DIR%" mkdir "%RELEASE_DIR%"
 
     copy "%ANDROID_DIR%\app\build\outputs\apk\mainline\release\app-mainline-release.apk" "%RELEASE_DIR%\eden_mainline_%DATE%.apk"
@@ -58,12 +57,11 @@ if "%FLAVOR%"=="2" (
 )
 
 echo [2/3] Building %TASK%...
-call gradlew.bat %TASK%
+call gradlew.bat %TASK% --no-daemon
 if %errorlevel% neq 0 ( echo FAILED & goto :end )
 
 echo [3/3] Copying APK...
-for /f "tokens=2 delims==" %%i in ('wmic os get LocalDateTime /value') do set DATETIME=%%i
-set DATE=%DATETIME:~2,6%
+for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyMMdd"') do set DATE=%%i
 
 if not exist "%RELEASE_DIR%" mkdir "%RELEASE_DIR%"
 
