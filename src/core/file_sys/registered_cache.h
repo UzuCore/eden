@@ -311,6 +311,7 @@ private:
     void ProcessNSP(const VirtualFile& file);
     void ProcessNSZ(const VirtualFile& file);
     void ProcessXCI(const VirtualFile& file);
+    void ProcessXCZ(const VirtualFile& file);
 
     std::vector<VirtualDir> load_dirs;
     ankerl::unordered_dense::map<std::tuple<u64, ContentRecordType, TitleType>, VirtualFile> entries;

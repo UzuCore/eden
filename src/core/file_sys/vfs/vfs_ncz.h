@@ -21,6 +21,13 @@ namespace FileSys {
 /// NCA 헤더 크기 (압축되지 않는 영역)
 constexpr std::size_t NCZ_NCA_HEADER_SIZE = 0x4000;
 
+/// NCZ 섹션 최대 개수
+/// NCA는 최대 4개의 논리 섹션을 가지지만, 업데이트 NCA는 AesCtrEx 암호화를 사용해
+/// 패치 entry마다 AES 카운터가 달라진다. nsz 도구는 이 각각의 암호화 구간을
+/// 별도 NczSection으로 저장하므로, 큰 업데이트 NCA는 수백 개의 NczSection을 가질 수 있다.
+/// 4096으로 충분히 넉넉하게 잡는다.
+constexpr s64 NCZ_MAX_SECTION_COUNT = 4096;
+
 /// NCZ 섹션 매직
 constexpr std::string_view NCZ_SECTION_MAGIC = "NCZSECTN";
 
@@ -70,8 +77,8 @@ enum class NczCryptoType : s64 {
 // ============================================================
 
 struct NczParsedHeader {
-    /// 원본 NCA 헤더 바이트 (0x4000)
-    std::array<u8, NCZ_NCA_HEADER_SIZE> nca_header_bytes{};
+    /// 원본 NCA 헤더 바이트 (보통 0x4000, BKTR NCA는 더 클 수 있음)
+    std::vector<u8> nca_header_bytes{};
 
     /// 섹션 목록
     std::vector<NczSectionEntry> sections;

@@ -66,33 +66,68 @@ std::optional<NczParsedHeader> ParseNczHeader(const VirtualFile& file) {
 
     NczParsedHeader hdr;
 
-    // 1) NCA 헤더 읽기 (0x4000 바이트)
-    const auto nca_hdr_read = file->Read(hdr.nca_header_bytes.data(),
-                                          NCZ_NCA_HEADER_SIZE, 0);
-    if (nca_hdr_read != NCZ_NCA_HEADER_SIZE) {
+    // 1) NCA 헤더 임시 읽기 (0x4000 바이트)
+    // 실제 헤더 크기는 NCZSECTN 위치 확정 후 재읽기할 수 있다.
+    hdr.nca_header_bytes.resize(NCZ_NCA_HEADER_SIZE, 0);
+    if (file->Read(hdr.nca_header_bytes.data(), NCZ_NCA_HEADER_SIZE, 0)
+            != NCZ_NCA_HEADER_SIZE) {
         LOG_ERROR(Loader, "Failed to read NCA header from NSZ");
         return std::nullopt;
     }
 
-    s64 pos = static_cast<s64>(NCZ_NCA_HEADER_SIZE);
-
-    // 2) "NCZSECTN" 매직 확인
+    // 2) "NCZSECTN" 매직 위치를 스캔한다.
+    //
+    //    NCZ는 NCA 헤더 직후에 NCZSECTN 매직을 배치한다.
+    //    일반 NCA는 섹션 0이 0x4000에서 시작하지만, 업데이트(BKTR) NCA는
+    //    섹션 오프셋이 다를 수 있다.
+    //    NCA 헤더가 암호화되어 있어 섹션 테이블을 직접 읽을 수 없으므로,
+    //    0x4000부터 0x200 단위로 매직을 스캔하여 실제 위치를 찾는다.
+    //    (NCA 섹션은 항상 0x200 경계에 정렬된다.)
+    s64 nczsectn_pos = -1;
     {
-        char magic[8];
-        if (file->Read(reinterpret_cast<u8*>(magic), 8, pos) != 8) return std::nullopt;
-        if (std::string_view(magic, 8) != NCZ_SECTION_MAGIC) {
-            LOG_ERROR(Loader, "NSZ: NCZSECTN magic not found at offset 0x{:X}", pos);
+        const s64 scan_end = std::min<s64>(0x80000LL, file_size - 8);
+        char magic_buf[8];
+        for (s64 scan = static_cast<s64>(NCZ_NCA_HEADER_SIZE);
+             scan <= scan_end;
+             scan += 0x200) {
+            if (file->Read(reinterpret_cast<u8*>(magic_buf), 8, scan) != 8) break;
+            if (std::string_view(magic_buf, 8) == NCZ_SECTION_MAGIC) {
+                nczsectn_pos = scan;
+                break;
+            }
+        }
+
+        if (nczsectn_pos < 0) {
+            LOG_ERROR(Loader, "NSZ: NCZSECTN magic not found in [0x{:X}, 0x{:X}]",
+                      NCZ_NCA_HEADER_SIZE, scan_end);
             return std::nullopt;
         }
-        pos += 8;
+
+        if (nczsectn_pos != static_cast<s64>(NCZ_NCA_HEADER_SIZE)) {
+            // 실제 NCA 헤더가 0x4000보다 크다 — 재읽기
+            LOG_INFO(Loader,
+                     "NCZ: NCZSECTN at 0x{:X} (expected 0x{:X}) — re-reading NCA header",
+                     nczsectn_pos, NCZ_NCA_HEADER_SIZE);
+            hdr.nca_header_bytes.resize(static_cast<std::size_t>(nczsectn_pos), 0);
+            if (file->Read(hdr.nca_header_bytes.data(),
+                           static_cast<std::size_t>(nczsectn_pos), 0)
+                    != static_cast<std::size_t>(nczsectn_pos)) {
+                LOG_ERROR(Loader, "NCZ: failed to re-read NCA header ({} bytes)",
+                          nczsectn_pos);
+                return std::nullopt;
+            }
+        }
     }
+
+    // NCZSECTN 다음부터 읽기 시작 (매직 8바이트는 이미 건너뜀)
+    s64 pos = nczsectn_pos + 8;
 
     // 3) 섹션 카운트 읽기
     s64 section_count = 0;
     if (file->Read(reinterpret_cast<u8*>(&section_count), 8, pos) != 8) return std::nullopt;
     pos += 8;
 
-    if (section_count <= 0 || section_count > 32) {
+    if (section_count <= 0 || section_count > NCZ_MAX_SECTION_COUNT) {
         LOG_ERROR(Loader, "NSZ: invalid section count {}", section_count);
         return std::nullopt;
     }
@@ -113,7 +148,7 @@ std::optional<NczParsedHeader> ParseNczHeader(const VirtualFile& file) {
         const auto& last = hdr.sections.back();
         hdr.nca_size = last.offset + last.size;
     } else {
-        hdr.nca_size = static_cast<s64>(NCZ_NCA_HEADER_SIZE);
+        hdr.nca_size = nczsectn_pos;
     }
 
     // 5) 블록 압축 매직 확인 (선택적)
@@ -302,26 +337,27 @@ std::size_t NczVfsFile::Read(u8* data, std::size_t length, std::size_t offset) c
     const s64 clamped_end = std::min(read_end, nca_size);
     std::size_t bytes_written = 0;
 
-    // ── 헤더 영역 (0 ~ 0x4000) ──────────────────────────────────
-    if (read_start < static_cast<s64>(NCZ_NCA_HEADER_SIZE)) {
+    // NCA 헤더 크기 (BKTR NCA는 0x4000보다 클 수 있음)
+    const s64 nca_hdr_size = static_cast<s64>(m_header.nca_header_bytes.size());
+
+    // ── 헤더 영역 ────────────────────────────────────────────────
+    if (read_start < nca_hdr_size) {
         const s64 hdr_read_start = read_start;
-        const s64 hdr_read_end   = std::min(clamped_end,
-                                             static_cast<s64>(NCZ_NCA_HEADER_SIZE));
+        const s64 hdr_read_end   = std::min(clamped_end, nca_hdr_size);
         const std::size_t hdr_len = static_cast<std::size_t>(hdr_read_end - hdr_read_start);
 
         std::memcpy(data, m_header.nca_header_bytes.data() + hdr_read_start, hdr_len);
         bytes_written += hdr_len;
     }
 
-    // ── 압축 데이터 영역 (0x4000 ~) ────────────────────────────
-    if (clamped_end > static_cast<s64>(NCZ_NCA_HEADER_SIZE)) {
-        const s64 data_start = std::max(read_start,
-                                         static_cast<s64>(NCZ_NCA_HEADER_SIZE));
+    // ── 압축 데이터 영역 ─────────────────────────────────────────
+    if (clamped_end > nca_hdr_size) {
+        const s64 data_start = std::max(read_start, nca_hdr_size);
         const s64 data_end   = clamped_end;
         const std::size_t data_len = static_cast<std::size_t>(data_end - data_start);
 
         u8* dst = data + (data_start - read_start);
-        const s64 decomp_offset = data_start - static_cast<s64>(NCZ_NCA_HEADER_SIZE);
+        const s64 decomp_offset = data_start - nca_hdr_size;
 
         const std::size_t decomp_read = ReadDecompressed(dst, data_len, decomp_offset);
         if (decomp_read > 0) {
@@ -516,7 +552,8 @@ std::size_t NczVfsFile::ReadBlockless(u8* buf, std::size_t length,
 
         // zstd 스트림 압축 해제 (전체 크기 사전에 알 수 없으므로 추정 후 재시도)
         const std::size_t estimated_size =
-            static_cast<std::size_t>(m_header.nca_size - static_cast<s64>(NCZ_NCA_HEADER_SIZE));
+            static_cast<std::size_t>(m_header.nca_size -
+                                     static_cast<s64>(m_header.nca_header_bytes.size()));
 
         s_cache.decompressed.resize(estimated_size);
         const std::size_t result = ZSTD_decompress(

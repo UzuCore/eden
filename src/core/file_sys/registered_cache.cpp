@@ -1346,6 +1346,8 @@ void ExternalContentProvider::ScanDirectory(const VirtualDir& dir) {
         return;
     }
 
+    LOG_INFO(Service_FS, "[NSZ-DIAG] ScanDirectory entering: {}", dir->GetName());
+
     for (const auto& file : dir->GetFiles()) {
         const auto filename = file->GetName();
         const auto dot_pos = filename.find_last_of('.');
@@ -1356,12 +1358,16 @@ void ExternalContentProvider::ScanDirectory(const VirtualDir& dir) {
 
         const auto extension = Common::ToLower(filename.substr(dot_pos + 1));
 
+        LOG_INFO(Service_FS, "[NSZ-DIAG]   found file: {} (ext={})", filename, extension);
+
         if (extension == "nsp") {
             ProcessNSP(file);
         } else if (extension == "nsz") {
             ProcessNSZ(file);
         } else if (extension == "xci") {
             ProcessXCI(file);
+        } else if (extension == "xcz") {
+            ProcessXCZ(file);
         }
     }
 
@@ -1381,25 +1387,36 @@ void ExternalContentProvider::ProcessNSP(const VirtualFile& file) {
 }
 
 void ExternalContentProvider::ProcessNSZ(const VirtualFile& file) {
-    const auto nca_file = FileSys::WrapNszAsNca(file);
-    if (!nca_file) {
-        LOG_WARNING(Service_FS, "Failed to wrap NSZ as NCA: {}", file->GetName());
+    // NSZ는 내부에 .ncz(압축 NCA) 파일들이 들어있는 NSP(PFS0) 컨테이너이다.
+    LOG_INFO(Service_FS, "[NSZ-DIAG] ProcessNSZ called for: {} (size={})",
+             file->GetName(), file->GetSize());
+
+    const auto nsp = OpenContainerAsNsp(file, Loader::FileType::NSP);
+    if (!nsp) {
+        LOG_ERROR(Service_FS, "[NSZ-DIAG] OpenContainerAsNsp returned null for: {}",
+                  file->GetName());
         return;
     }
 
-    const auto nca = std::make_shared<NCA>(nca_file);
-    if (nca->GetStatus() != Loader::ResultStatus::Success &&
-        nca->GetStatus() != Loader::ResultStatus::ErrorMissingBKTRBaseRomFS) {
-        LOG_WARNING(Service_FS, "NSZ NCA parse failed: {} (status={})",
-                    file->GetName(), static_cast<int>(nca->GetStatus()));
-        return;
+    LOG_INFO(Service_FS, "[NSZ-DIAG] NSP opened, status={}, ncas.size()={}, files in PFS={}",
+             static_cast<int>(nsp->GetStatus()),
+             nsp->GetNCAs().size(),
+             nsp->GetFiles().size());
+
+    // PFS 내부 파일 목록을 로그로 출력 - cnmt 파일이 어떤 확장자인지 확인용
+    for (const auto& inner : nsp->GetFiles()) {
+        if (inner) {
+            LOG_INFO(Service_FS, "[NSZ-DIAG]   PFS entry: {} ({} bytes)",
+                     inner->GetName(), inner->GetSize());
+        }
     }
- 
-    LOG_INFO(Service_FS, "Registered NSZ: {} (title_id={:016X})",
-             file->GetName(), nca->GetTitleId());
- 
-    const auto content_type = GetCRTypeFromNCAType(nca->GetType());
-    entries[{nca->GetTitleId(), content_type, TitleType::Application}] = nca_file;
+
+    const size_t before = entries.size();
+    const bool added = AddExternalEntriesFromContainer(nsp, entries, versions,
+                                                       multi_version_entries);
+    LOG_INFO(Service_FS,
+             "[NSZ-DIAG] AddExternalEntriesFromContainer returned {}, entries before={} after={}",
+             added, before, entries.size());
 }
 
 void ExternalContentProvider::ProcessXCI(const VirtualFile& file) {
@@ -1408,6 +1425,20 @@ void ExternalContentProvider::ProcessXCI(const VirtualFile& file) {
         return;
     }
 
+    AddExternalEntriesFromContainer(nsp, entries, versions, multi_version_entries);
+}
+
+void ExternalContentProvider::ProcessXCZ(const VirtualFile& file) {
+    // XCZ는 내부에 .ncz가 들어있는 XCI(HFS0) 컨테이너이다.
+    // XCI 처리와 동일한 흐름을 따라가면 secure 파티션이 NSP로 노출되어
+    // 내부의 .ncz까지 정상적으로 인식된다.
+    const auto nsp = OpenContainerAsNsp(file, Loader::FileType::XCI);
+    if (!nsp) {
+        LOG_WARNING(Service_FS, "Failed to open XCZ as container: {}", file->GetName());
+        return;
+    }
+
+    LOG_DEBUG(Service_FS, "Processing XCZ file: {}", file->GetName());
     AddExternalEntriesFromContainer(nsp, entries, versions, multi_version_entries);
 }
 

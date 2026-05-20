@@ -217,17 +217,54 @@ void NSP::InitializeExeFSAndRomFS(const std::vector<VirtualFile>& files) {
 }
 
 void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
+    LOG_INFO(Service_FS, "[NSZ-DIAG] NSP::ReadNCAs called, files count={}", files.size());
+    int cnmt_count = 0;
+
     for (const auto& outer_file : files) {
-        if (outer_file->GetName().size() < 9 ||
-            outer_file->GetName().substr(outer_file->GetName().size() - 9) != ".cnmt.nca") {
+        const auto& outer_name = outer_file->GetName();
+
+        // cnmt 파일은 두 가지 형태로 존재 가능:
+        //   - "<hash>.cnmt.nca" : 일반 NSP 및 cnmt를 압축하지 않는 NSZ
+        //   - "<hash>.cnmt.ncz" : cnmt까지 압축한 NSZ (대부분의 nsz 도구 기본 동작)
+        // 둘 다 처리하지 않으면 NSZ에서 메타데이터를 읽지 못해 외부 콘텐츠(DLC/업데이트)가
+        // 등록되지 않는다.
+        const bool is_cnmt_nca = outer_name.size() >= 9 &&
+                                 outer_name.substr(outer_name.size() - 9) == ".cnmt.nca";
+        const bool is_cnmt_ncz = outer_name.size() >= 9 &&
+                                 outer_name.substr(outer_name.size() - 9) == ".cnmt.ncz";
+
+        if (!is_cnmt_nca && !is_cnmt_ncz) {
             continue;
         }
 
-        const auto nca = std::make_shared<NCA>(outer_file);
+        ++cnmt_count;
+        LOG_INFO(Service_FS, "[NSZ-DIAG]   cnmt candidate: {} (is_ncz={})", outer_name, is_cnmt_ncz);
+
+        // .cnmt.ncz라면 NCA로 풀어준다.
+        auto cnmt_nca_file = outer_file;
+        if (is_cnmt_ncz) {
+            cnmt_nca_file = WrapNszAsNca(cnmt_nca_file);
+            if (cnmt_nca_file == nullptr) {
+                LOG_ERROR(Service_FS,
+                          "[NSZ-DIAG] WrapNszAsNca FAILED for cnmt: {}",
+                          outer_name);
+                continue;
+            }
+            LOG_INFO(Service_FS, "[NSZ-DIAG]   WrapNszAsNca OK for cnmt: {}", outer_name);
+        }
+
+        const auto nca = std::make_shared<NCA>(cnmt_nca_file);
         if (nca->GetStatus() != Loader::ResultStatus::Success || nca->GetSubdirectories().empty()) {
+            LOG_ERROR(Service_FS,
+                      "[NSZ-DIAG]   cnmt NCA parse failed: {} (status={}, subdirs={})",
+                      outer_name, static_cast<int>(nca->GetStatus()),
+                      nca->GetSubdirectories().size());
             program_status[nca->GetTitleId()] = nca->GetStatus();
             continue;
         }
+
+        LOG_INFO(Service_FS, "[NSZ-DIAG]   cnmt NCA parsed OK, title_id={:016X}",
+                 nca->GetTitleId());
 
         const auto section0 = nca->GetSubdirectories()[0];
 
@@ -238,10 +275,23 @@ void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
 
             const CNMT cnmt(inner_file);
 
+            LOG_INFO(Service_FS,
+                     "[NSZ-DIAG]   CNMT loaded: title_id={:016X}, type={} (0x{:02X}), records={}",
+                     cnmt.GetTitleID(),
+                     static_cast<int>(cnmt.GetType()),
+                     static_cast<unsigned>(cnmt.GetType()),
+                     cnmt.GetContentRecords().size());
+
             ncas[cnmt.GetTitleID()][{cnmt.GetType(), ContentRecordType::Meta}] = nca;
 
             for (const auto& rec : cnmt.GetContentRecords()) {
                 const auto id_string = Common::HexToString(rec.nca_id, false);
+                LOG_INFO(Service_FS,
+                         "[NSZ-DIAG]     record: nca_id={}, type={} (0x{:02X})",
+                         id_string,
+                         static_cast<int>(rec.type),
+                         static_cast<unsigned>(rec.type));
+
                 auto next_file = pfs->GetFile(fmt::format("{}.nca", id_string));
 
                 if (next_file == nullptr) {
@@ -269,6 +319,13 @@ void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
 
                 auto next_nca = std::make_shared<NCA>(std::move(next_file));
 
+                LOG_INFO(Service_FS,
+                         "[NSZ-DIAG]     next_nca: title_id={:016X}, content_type={} (0x{:02X}), nca_status={}",
+                         next_nca->GetTitleId(),
+                         static_cast<int>(next_nca->GetType()),
+                         static_cast<unsigned>(next_nca->GetType()),
+                         static_cast<int>(next_nca->GetStatus()));
+
                 if (next_nca->GetType() == NCAContentType::Program) {
                     program_status[next_nca->GetTitleId()] = next_nca->GetStatus();
                     program_ids.insert(next_nca->GetTitleId() & 0xFFFFFFFFFFFFF000);
@@ -288,6 +345,12 @@ void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
                     // update NCA.
                     if ((next_nca->GetTitleId() & 0x7FF) != 0 &&
                         (next_nca->GetTitleId() & 0x800) == 0) {
+                        LOG_INFO(Service_FS,
+                                 "[NSZ-DIAG]     -> storing as MULTI-PROG UPDATE under key tid={:016X}, "
+                                 "title_type={} (cnmt.GetType), content_type={}",
+                                 next_nca->GetTitleId(),
+                                 static_cast<int>(cnmt.GetType()),
+                                 static_cast<int>(rec.type));
                         ncas[next_nca->GetTitleId()][{cnmt.GetType(), rec.type}] =
                             std::move(next_nca);
                     } else {
@@ -297,11 +360,25 @@ void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
                         auto existing = target_map.find({cnmt.GetType(), rec.type});
 
                         if (existing != target_map.end() && rec.type == ContentRecordType::Program) {
+                            LOG_INFO(Service_FS,
+                                     "[NSZ-DIAG]     -> SKIPPING duplicate update Program NCA");
                             continue;
                         }
+                        LOG_INFO(Service_FS,
+                                 "[NSZ-DIAG]     -> storing as UPDATE under key tid={:016X}, "
+                                 "title_type={} (cnmt.GetType), content_type={}",
+                                 cnmt.GetTitleID(),
+                                 static_cast<int>(cnmt.GetType()),
+                                 static_cast<int>(rec.type));
                         ncas[cnmt.GetTitleID()][{cnmt.GetType(), rec.type}] = std::move(next_nca);
                     }
                 } else {
+                    LOG_INFO(Service_FS,
+                             "[NSZ-DIAG]     -> storing as BASE under key tid={:016X}, "
+                             "title_type={} (cnmt.GetType), content_type={}",
+                             next_nca->GetTitleId(),
+                             static_cast<int>(cnmt.GetType()),
+                             static_cast<int>(rec.type));
                     ncas[next_nca->GetTitleId()][{cnmt.GetType(), rec.type}] = std::move(next_nca);
                 }
             }
@@ -309,5 +386,8 @@ void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
             break;
         }
     }
+
+    LOG_INFO(Service_FS, "[NSZ-DIAG] NSP::ReadNCAs done, cnmt found={}, ncas titles={}",
+             cnmt_count, ncas.size());
 }
 } // namespace FileSys
