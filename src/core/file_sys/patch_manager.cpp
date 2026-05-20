@@ -185,26 +185,15 @@ VirtualDir PatchManager::PatchExeFS(VirtualDir exefs) const {
     const auto* content_union = static_cast<const ContentProviderUnion*>(&content_provider);
     const auto update_tid = GetUpdateTitleID(title_id);
 
-    LOG_INFO(Service_FS,
-             "[NSZ-DIAG] PatchManager checking updates: base_title_id={:016X}, update_tid={:016X}",
-             title_id, update_tid);
-
     if (content_union) {
         // First, check ExternalContentProvider
         const auto* external_provider = content_union->GetExternalProvider();
         if (external_provider) {
             const auto update_versions = external_provider->ListUpdateVersions(update_tid);
 
-            LOG_INFO(Service_FS,
-                     "[NSZ-DIAG]   ExternalContentProvider->ListUpdateVersions({:016X}) returned {} entries",
-                     update_tid, update_versions.size());
-
             if (!update_versions.empty()) {
                 checked_external = true;
                 for (const auto& update_entry : update_versions) {
-                    LOG_INFO(Service_FS,
-                             "[NSZ-DIAG]     update entry: title_id={:016X}, version={}, version_string={}",
-                             update_entry.title_id, update_entry.version, update_entry.version_string);
                     if (!IsVersionedExternalUpdateDisabled(disabled, update_entry.version)) {
                         update_disabled = false;
                         enabled_version = update_entry.version;
@@ -212,8 +201,6 @@ VirtualDir PatchManager::PatchExeFS(VirtualDir exefs) const {
                     }
                 }
             }
-        } else {
-            LOG_INFO(Service_FS, "[NSZ-DIAG]   ExternalContentProvider is NULL");
         }
 
         // Also check ManualContentProvider (for Android)
