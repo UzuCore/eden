@@ -1090,7 +1090,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
     private fun addQuickSettings() {
         binding.quickSettingsSheet.apply {
             val container = binding.quickSettingsSheet.findViewById<ViewGroup>(R.id.quick_settings_container)
-            val isSharpnessFilterSelected = isSharpnessScalingFilterSelected()
+            val isFsrSelected = isFsrScalingFilterSelected()
 
             container.removeAllViews()
 
@@ -1176,7 +1176,7 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
                 addQuickSettings()
             }
 
-            if (isSharpnessFilterSelected) {
+            if (isFsrSelected) {
                 quickSettings.addSliderSetting(
                     R.string.fsr_sharpness,
                     container,
@@ -1197,24 +1197,17 @@ class EmulationFragment : Fragment(), SurfaceHolder.Callback {
         }
     }
 
-    private fun isSharpnessScalingFilterSelected(): Boolean {
+    private fun isFsrScalingFilterSelected(): Boolean {
+        val fsrFilterValue = resolveFsrScalingFilterValue() ?: return false
         val selectedFilter = IntSetting.RENDERER_SCALING_FILTER.getInt(needsGlobal = false)
-        return selectedFilter in resolveSharpnessScalingFilterValues()
+        return selectedFilter == fsrFilterValue
     }
 
-    private fun resolveSharpnessScalingFilterValues(): Set<Int> {
+    private fun resolveFsrScalingFilterValue(): Int? {
         val names = resources.getStringArray(R.array.rendererScalingFilterNames)
         val values = resources.getIntArray(R.array.rendererScalingFilterValues)
-        val sharpnessFilterNames = setOf(
-            getString(R.string.scaling_filter_fsr),
-            getString(R.string.scaling_filter_sgsr),
-            getString(R.string.scaling_filter_sgsr_edge),
-        )
-        return names.asSequence()
-            .mapIndexedNotNull { index, name ->
-                if (name in sharpnessFilterNames && index in values.indices) values[index] else null
-            }
-            .toSet()
+        val fsrIndex = names.indexOf(getString(R.string.scaling_filter_fsr))
+        return if (fsrIndex in values.indices) values[fsrIndex] else null
     }
 
     private fun openQuickSettingsMenu() {

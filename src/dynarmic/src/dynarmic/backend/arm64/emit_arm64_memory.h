@@ -6,7 +6,6 @@
  * SPDX-License-Identifier: 0BSD
  */
 
-#pragma once
 #include <cstddef>
 
 namespace oaknut {

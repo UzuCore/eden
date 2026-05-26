@@ -615,9 +615,6 @@ Status BufferQueueProducer::Query(NativeWindow what, s32* out_value) {
     case NativeWindow::ConsumerUsageBits:
         value = core->consumer_usage_bit;
         break;
-    case NativeWindow::DefaultDataSpace:
-        value = core->GetMaxBufferCountLocked(false);
-        break;
     default:
         ASSERT(false);
         return Status::BadValue;

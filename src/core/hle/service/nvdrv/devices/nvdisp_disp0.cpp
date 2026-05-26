@@ -79,9 +79,7 @@ void nvdisp_disp0::Composite(std::span<const Nvnflinger::HwcLayer> sorted_layers
         });
 
         for (size_t i = 0; i < layer.acquire_fence.num_fences; i++) {
-            if (layer.acquire_fence.fences[i].id >= 0) {
-                output_fences.push_back(layer.acquire_fence.fences[i]);
-            }
+            output_fences.push_back(layer.acquire_fence.fences[i]);
         }
     }
 
