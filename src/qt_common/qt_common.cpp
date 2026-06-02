@@ -5,6 +5,7 @@
 
 #include "common/memory_detect.h"
 #include "core/hle/service/filesystem/filesystem.h"
+#include "frontend_common/data_manager.h"
 #include "hid_core/hid_core.h"
 #include "network/network.h"
 #include "qt_common.h"
@@ -13,11 +14,8 @@
 #include "common/fs/path_util.h"
 #include "common/logging.h"
 #include "common/scm_rev.h"
+#include "common/cpu_features.h"
 #include "core/memory.h"
-
-#ifdef ARCHITECTURE_x86_64
-#include "common/x64/cpu_detect.h"
-#endif
 
 #include <QGuiApplication>
 #include <QStringLiteral>
@@ -30,6 +28,7 @@
 
 #include <thread>
 #include <JlCompress.h>
+#include <QPainter>
 
 #if !defined(WIN32) && !defined(__APPLE__)
 #include <qpa/qplatformnativeinterface.h>
@@ -90,8 +89,37 @@ Core::Frontend::EmuWindow::WindowSystemInfo GetWindowSystemInfo(QWindow* window)
     // Our Win32 Qt external doesn't have the private API.
     wsi.render_surface = reinterpret_cast<void*>(window->winId());
 #elif defined(__APPLE__)
-    wsi.render_surface = reinterpret_cast<void* (*)(id, SEL)>(objc_msgSend)(
+    id layer = reinterpret_cast<id (*)(id, SEL)>(objc_msgSend)(
         reinterpret_cast<id>(window->winId()), sel_registerName("layer"));
+
+    // In Qt 6, the layer of the NSView might be a QContainerLayer.
+    // MoltenVK needs a CAMetalLayer. We search for it in sublayers.
+    Class metal_layer_class = objc_getClass("CAMetalLayer");
+    id metal_layer = nullptr;
+
+    if (layer) {
+        if (reinterpret_cast<bool (*)(id, SEL, Class)>(objc_msgSend)(
+                layer, sel_registerName("isKindOfClass:"), metal_layer_class)) {
+            metal_layer = layer;
+        } else {
+            id sublayers = reinterpret_cast<id (*)(id, SEL)>(objc_msgSend)(
+                layer, sel_registerName("sublayers"));
+            if (sublayers) {
+                unsigned long count = reinterpret_cast<unsigned long (*)(id, SEL)>(objc_msgSend)(
+                    sublayers, sel_registerName("count"));
+                for (unsigned long i = 0; i < count; ++i) {
+                    id sublayer = reinterpret_cast<id (*)(id, SEL, unsigned long)>(objc_msgSend)(
+                        sublayers, sel_registerName("objectAtIndex:"), i);
+                    if (reinterpret_cast<bool (*)(id, SEL, Class)>(objc_msgSend)(
+                            sublayer, sel_registerName("isKindOfClass:"), metal_layer_class)) {
+                        metal_layer = sublayer;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    wsi.render_surface = reinterpret_cast<void*>(metal_layer ? metal_layer : layer);
 #else
     QPlatformNativeInterface* pni = QGuiApplication::platformNativeInterface();
     wsi.display_connection = pni->nativeResourceForWindow("display", window);
@@ -214,7 +242,7 @@ void Init(QWidget* root) {
     LOG_INFO(Frontend, "Eden Version: {}", yuzu_build_version);
     LogRuntimes();
 #ifdef ARCHITECTURE_x86_64
-    const auto& caps = Common::GetCPUCaps();
+    const auto& caps = Common::g_cpu_caps;
     std::string cpu_string = caps.cpu_string;
     if (caps.avx || caps.avx2 || caps.avx512f) {
         cpu_string += " | AVX";
@@ -279,6 +307,21 @@ void SetupContentProviders() {
 
 void SetupHID() {
     system->HIDCore().ReloadInputDevices();
+}
+
+QString ReadableByteSize(qulonglong size) {
+    return QString::fromStdString(FrontendCommon::DataManager::ReadableBytesSize(size));
+}
+
+QPixmap CreateCirclePixmapFromColor(const QColor& color) {
+    QPixmap circle_pixmap(16, 16);
+    circle_pixmap.fill(Qt::transparent);
+    QPainter painter(&circle_pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(color);
+    painter.setBrush(color);
+    painter.drawEllipse({circle_pixmap.width() / 2.0, circle_pixmap.height() / 2.0}, 7.0, 7.0);
+    return circle_pixmap;
 }
 
 } // namespace QtCommon
