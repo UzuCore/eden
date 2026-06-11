@@ -729,7 +729,7 @@ Options lower than 1X can cause artifacts.</source>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="152"/>
         <source>Determines how sharpened the image will look using FSR&apos;s or SGSR&apos;s dynamic contrast.</source>
-        <translation type="unfinished"/>
+        <translation>确定使用 FSR 或 SGSR 的动态对比度时图像看起来有多锐利。</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="153"/>
@@ -878,13 +878,14 @@ Aggressive mode may impact performance of other applications such as recording s
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="196"/>
         <source>Anti-Flicker</source>
-        <translation type="unfinished"/>
+        <translation>防闪烁</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="197"/>
         <source>Forces GPU fence callbacks to wait for submitted GPU work.
 Use with Fast GPU mode, to avoid flicker with lower performance impact.</source>
-        <translation type="unfinished"/>
+        <translation>强制 GPU fence 回调等待已提交的 GPU 工作。
+与快速 GPU 模式一起使用,以避免较低性能影响下的闪烁。</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="199"/>
@@ -1656,12 +1657,12 @@ When a program attempts to open the controller applet, it is immediately closed.
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="495"/>
         <source>Snapdragon Game Super Resolution</source>
-        <translation type="unfinished"/>
+        <translation>骁龙游戏超级分辨率</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="496"/>
         <source>Snapdragon Game Super Resolution EdgeDir</source>
-        <translation type="unfinished"/>
+        <translation>骁龙游戏超级分辨率 EdgeDir</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.cpp" line="500"/>
@@ -3344,7 +3345,7 @@ Would you like to delete the old save data?</source>
         <location filename="../../src/yuzu/configuration/configure_graphics.cpp" line="224"/>
         <source>%</source>
         <comment>FSR/SGSR sharpening percentage (e.g. 50%)</comment>
-        <translation type="unfinished"/>
+        <translation>%</translation>
     </message>
     <message>
         <location filename="../../src/yuzu/configuration/configure_graphics.cpp" line="361"/>
@@ -4797,57 +4798,57 @@ Current values are %1% and %2% respectively.</source>
         <translation>只有当游戏不在运行时，某些设置项才可用。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="77"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="78"/>
         <source>Add-Ons</source>
         <translation>附加项</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="78"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="79"/>
         <source>System</source>
         <translation>系统</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="79"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="80"/>
         <source>CPU</source>
         <translation>CPU</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="80"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="81"/>
         <source>Graphics</source>
         <translation>图形</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="81"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="82"/>
         <source>Adv. Graphics</source>
         <translation>高级图形</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="82"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="83"/>
         <source>Ext. Graphics</source>
         <translation>扩展图形</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="83"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="84"/>
         <source>Audio</source>
         <translation>声音</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="84"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="85"/>
         <source>Input Profiles</source>
         <translation>输入配置文件</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="85"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="86"/>
         <source>Network</source>
         <translation>网络</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="86"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="87"/>
         <source>Applets</source>
         <translation>小程序</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="89"/>
+        <location filename="../../src/yuzu/configuration/configure_per_game.cpp" line="90"/>
         <source>Properties</source>
         <translation>属性</translation>
     </message>
@@ -6110,285 +6111,288 @@ Please go to Configure -&gt; System -&gt; Network and make a selection.</source>
     <message>
         <location filename="../../src/yuzu/bootmanager.cpp" line="916"/>
         <source>This build doesn&apos;t have OpenGL support.</source>
-        <translation type="unfinished"/>
+        <translation>此版本不支持 OpenGL。</translation>
     </message>
 </context>
 <context>
     <name>GameList</name>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="685"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="380"/>
         <source>&amp;Add New Game Directory</source>
         <translation>添加新游戏目录 (&amp;A)</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="719"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="414"/>
         <source>Favorite</source>
         <translation>收藏</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="721"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="416"/>
         <source>Start Game</source>
         <translation>开始游戏</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="723"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="418"/>
         <source>Start Game without Custom Configuration</source>
         <translation>使用公共设置项进行游戏</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="725"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="420"/>
         <source>Open Save Data Location</source>
         <translation>打开存档位置</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="726"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="421"/>
         <source>Open Mod Data Location</source>
         <translation>打开 MOD 数据位置</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="728"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="423"/>
         <source>Open Transferable Pipeline Cache</source>
         <translation>打开可转移着色器缓存</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="729"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="424"/>
         <source>Link to Ryujinx</source>
         <translation>链接到 Ryujinx</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="731"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="426"/>
         <source>Remove</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="732"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="427"/>
         <source>Remove Installed Update</source>
         <translation>删除已安装的游戏更新</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="733"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="428"/>
         <source>Remove All Installed DLC</source>
         <translation>删除所有已安装 DLC</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="734"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="429"/>
         <source>Remove Custom Configuration</source>
         <translation>删除自定义设置</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="735"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="430"/>
         <source>Remove Cache Storage</source>
         <translation>移除缓存</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="736"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="431"/>
         <source>Remove OpenGL Pipeline Cache</source>
         <translation>删除 OpenGL 着色器缓存</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="737"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="432"/>
         <source>Remove Vulkan Pipeline Cache</source>
         <translation>删除 Vulkan 着色器缓存</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="739"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="434"/>
         <source>Remove All Pipeline Caches</source>
         <translation>删除所有着色器缓存</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="740"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="435"/>
         <source>Remove All Installed Contents</source>
         <translation>删除所有安装的项目</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="741"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="436"/>
         <source>Manage Play Time</source>
         <translation>管理游戏时间</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="742"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="437"/>
         <source>Edit Play Time Data</source>
         <translation>编辑游戏时间数据</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="743"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="438"/>
         <source>Remove Play Time Data</source>
         <translation>清除游玩时间</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="744"/>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="745"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="439"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="440"/>
         <source>Dump RomFS</source>
         <translation>转储 RomFS</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="746"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="441"/>
         <source>Dump RomFS to SDMC</source>
         <translation>转储 RomFS 到 SDMC</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="747"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="442"/>
         <source>Verify Integrity</source>
         <translation>完整性验证</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="748"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="443"/>
         <source>Copy Title ID to Clipboard</source>
         <translation>复制游戏 ID 到剪贴板</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="749"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="444"/>
         <source>Navigate to GameDB entry</source>
         <translation>查看兼容性报告</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="752"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="446"/>
         <source>Create Shortcut</source>
         <translation>创建快捷方式</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="753"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="447"/>
         <source>Add to Desktop</source>
         <translation>添加到桌面</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="755"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="449"/>
         <source>Add to Applications Menu</source>
         <translation>添加到应用程序菜单</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="758"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="452"/>
         <source>Configure Game</source>
         <translation>配置游戏</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="857"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="552"/>
         <source>Scan Subfolders</source>
         <translation>扫描子文件夹</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="858"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="553"/>
         <source>Remove Game Directory</source>
         <translation>移除游戏目录</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="877"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="572"/>
         <source>▲ Move Up</source>
         <translation>▲ 向上移动</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="878"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="573"/>
         <source>▼ Move Down</source>
         <translation>▼ 向下移动</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="879"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="574"/>
         <source>Open Directory Location</source>
         <translation>打开目录位置</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="925"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="614"/>
         <source>Clear</source>
         <translation>清除</translation>
-    </message>
-    <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="989"/>
-        <source>Name</source>
-        <translation>名称</translation>
-    </message>
-    <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="990"/>
-        <source>Compatibility</source>
-        <translation>兼容性</translation>
-    </message>
-    <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="991"/>
-        <source>Add-ons</source>
-        <translation>附加项</translation>
-    </message>
-    <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="992"/>
-        <source>File type</source>
-        <translation>文件类型</translation>
-    </message>
-    <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="993"/>
-        <source>Size</source>
-        <translation>大小</translation>
-    </message>
-    <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="994"/>
-        <source>Play time</source>
-        <translation>游玩时间</translation>
     </message>
 </context>
 <context>
     <name>GameListItemCompat</name>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="186"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="185"/>
         <source>Ingame</source>
         <translation>可进游戏</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="186"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="185"/>
         <source>Game starts, but crashes or major glitches prevent it from being completed.</source>
         <translation>游戏可以开始，但会出现崩溃或严重故障导致游戏无法继续。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="188"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="187"/>
         <source>Perfect</source>
         <translation>完美</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="188"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="187"/>
         <source>Game can be played without issues.</source>
         <translation>游戏可以毫无问题地运行。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="189"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="188"/>
         <source>Playable</source>
         <translation>可运行</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="189"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="188"/>
         <source>Game functions with minor graphical or audio glitches and is playable from start to finish.</source>
         <translation>游戏可以从头到尾完整地运行，但可能出现轻微的图形或音频故障。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="192"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="191"/>
         <source>Intro/Menu</source>
         <translation>开场/菜单</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="192"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="191"/>
         <source>Game loads, but is unable to progress past the Start Screen.</source>
         <translation>游戏可以加载，但无法通过标题页面。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="193"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="192"/>
         <source>Won&apos;t Boot</source>
         <translation>无法启动</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="193"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="192"/>
         <source>The game crashes when attempting to startup.</source>
         <translation>在启动游戏时直接崩溃。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="194"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="193"/>
         <source>Not Tested</source>
         <translation>未测试</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="194"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="193"/>
         <source>The game has not yet been tested.</source>
         <translation>游戏尚未经过测试。</translation>
     </message>
 </context>
 <context>
+    <name>GameListModel</name>
+    <message>
+        <location filename="../../src/qt_common/game_list/model.cpp" line="285"/>
+        <source>Name</source>
+        <translation>名称</translation>
+    </message>
+    <message>
+        <location filename="../../src/qt_common/game_list/model.cpp" line="286"/>
+        <source>Compatibility</source>
+        <translation>兼容性</translation>
+    </message>
+    <message>
+        <location filename="../../src/qt_common/game_list/model.cpp" line="287"/>
+        <source>Add-ons</source>
+        <translation>附加内容</translation>
+    </message>
+    <message>
+        <location filename="../../src/qt_common/game_list/model.cpp" line="288"/>
+        <source>File type</source>
+        <translation>文件类型</translation>
+    </message>
+    <message>
+        <location filename="../../src/qt_common/game_list/model.cpp" line="289"/>
+        <source>Size</source>
+        <translation>大小</translation>
+    </message>
+    <message>
+        <location filename="../../src/qt_common/game_list/model.cpp" line="290"/>
+        <source>Play time</source>
+        <translation>游戏时间</translation>
+    </message>
+</context>
+<context>
     <name>GameListPlaceholder</name>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="1328"/>
+        <location filename="../../src/yuzu/game/game_list.cpp" line="757"/>
         <source>Double-click to add a new folder to the game list</source>
         <translation>双击添加新的游戏文件夹</translation>
     </message>
@@ -6396,17 +6400,17 @@ Please go to Configure -&gt; System -&gt; Network and make a selection.</source>
 <context>
     <name>GameListSearchField</name>
     <message numerus="yes">
-        <location filename="../../src/yuzu/game/game_list.cpp" line="96"/>
+        <location filename="../../src/yuzu/game/search_field.cpp" line="67"/>
         <source>%1 of %n result(s)</source>
         <translation><numerusform>%n个结果中的第%1个</numerusform></translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="1006"/>
+        <location filename="../../src/yuzu/game/search_field.cpp" line="122"/>
         <source>Filter:</source>
         <translation>搜索:</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list.cpp" line="1007"/>
+        <location filename="../../src/yuzu/game/search_field.cpp" line="123"/>
         <source>Enter pattern to filter</source>
         <translation>搜索游戏</translation>
     </message>
@@ -8157,12 +8161,12 @@ Would you like to bypass this and exit anyway?</source>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.h" line="56"/>
         <source>SGSR</source>
-        <translation type="unfinished"/>
+        <translation>SGSR</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.h" line="57"/>
         <source>SGSR EdgeDir</source>
-        <translation type="unfinished"/>
+        <translation>SGSR EdgeDir</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/config/shared_translation.h" line="61"/>
@@ -8253,7 +8257,7 @@ If you wish to clean up the files which were left in the old data location, you 
 %1</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/migration_worker.h" line="74"/>
+        <location filename="../../src/yuzu/migration_worker.h" line="73"/>
         <source>Data was migrated successfully.</source>
         <translation>数据已成功迁移。</translation>
     </message>
@@ -9111,47 +9115,47 @@ p, li { white-space: pre-wrap; }
         <translation>%1 正在玩 %2</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="88"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="87"/>
         <source>Play Time: %1</source>
         <translation>游玩时间：%1</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="91"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="90"/>
         <source>Never Played</source>
         <translation>未曾游玩</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="99"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="98"/>
         <source>Version: %1</source>
         <translation>版本：%1</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="101"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="100"/>
         <source>Version: 1.0.0</source>
         <translation>版本：1.0.0</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="308"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="307"/>
         <source>Installed SD Titles</source>
         <translation>SD 卡中安装的项目</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="316"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="315"/>
         <source>Installed NAND Titles</source>
         <translation>NAND 中安装的项目</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="324"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="323"/>
         <source>System Titles</source>
         <translation>系统项目</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="367"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="366"/>
         <source>Add New Game Directory</source>
         <translation>添加游戏目录</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/game/game_list_p.h" line="390"/>
+        <location filename="../../src/qt_common/game_list/game_list_p.h" line="389"/>
         <source>Favorites</source>
         <translation>收藏</translation>
     </message>
@@ -9526,34 +9530,36 @@ Only do this if you&apos;re 100% sure you want to delete this data.</source>
     <message>
         <location filename="../../src/qt_common/util/content.cpp" line="501"/>
         <source>Keys not installed</source>
-        <translation type="unfinished"/>
+        <translation>未安装密钥</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/util/content.cpp" line="502"/>
         <source>Install decryption keys and restart Eden before attempting to install firmware.</source>
-        <translation type="unfinished"/>
+        <translation>在尝试安装固件之前先安装解密密钥并重启 Eden。</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/util/content.cpp" line="514"/>
         <source>Select Dumped Firmware Source Location</source>
-        <translation type="unfinished"/>
+        <translation>选择已转储的固件源位置</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/util/content.cpp" line="525"/>
         <source>Select Dumped Firmware ZIP</source>
-        <translation type="unfinished"/>
+        <translation>选择已转储的固件 ZIP</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/util/content.cpp" line="542"/>
         <source>Firmware cleanup failed</source>
-        <translation type="unfinished"/>
+        <translation>清理固件失败</translation>
     </message>
     <message>
         <location filename="../../src/qt_common/util/content.cpp" line="543"/>
         <source>Failed to clean up extracted firmware cache.
 Check write permissions in the system temp directory and try again.
 OS reported error: %1</source>
-        <translation type="unfinished"/>
+        <translation>清理提取的固件缓存失败。
+请检查系统临时目录的写入权限然后重试。
+OS 报告的错误: %1</translation>
     </message>
 </context>
 <context>
@@ -9874,37 +9880,37 @@ Would you like to manually select a portable folder to use?</source>
 <context>
     <name>QtCommon::Mod</name>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="44"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="47"/>
         <source>Mod Name</source>
         <translation>模组名称</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="44"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="47"/>
         <source>What should this mod be called?</source>
         <translation>这个模组应该叫什么名字？</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="54"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="57"/>
         <source>RomFS</source>
         <translation>RomFS</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="55"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="58"/>
         <source>ExeFS/Patch</source>
         <translation>ExeFS/Patch</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="56"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="59"/>
         <source>Cheat</source>
         <translation>作弊</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="60"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="63"/>
         <source>Mod Type</source>
         <translation>模组类型</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="61"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="64"/>
         <source>Could not detect mod type automatically. Please manually specify the type of mod you downloaded.
 
 Most mods are RomFS mods, but patches (.pchtxt) are typically ExeFS mods.</source>
@@ -9913,18 +9919,18 @@ Most mods are RomFS mods, but patches (.pchtxt) are typically ExeFS mods.</sourc
 大多数模组是 RomFS 模组，但补丁（.pchtxt）通常是 ExeFS 模组。</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="123"/>
-        <location filename="../../src/qt_common/util/mod.cpp" line="136"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="126"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="139"/>
         <source>Mod Extract Failed</source>
         <translation>模组提取失败</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="124"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="127"/>
         <source>Failed to create temporary directory %1</source>
         <translation>未能创建临时 %1 目录</translation>
     </message>
     <message>
-        <location filename="../../src/qt_common/util/mod.cpp" line="137"/>
+        <location filename="../../src/qt_common/util/mod.cpp" line="140"/>
         <source>Zip file %1 is empty</source>
         <translation>压缩文件 %1 是空的。</translation>
     </message>
@@ -10626,66 +10632,66 @@ By selecting &quot;From Eden&quot;, previous save data stored in Ryujinx will be
         <translation>%1 可用于下载。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="78"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="79"/>
         <source>New Version Location</source>
         <translation>新版本位置</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="80"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="81"/>
         <source>All Files (*.*)</source>
         <translation>所有文件 (*.*)</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="88"/>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="128"/>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="143"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="89"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="129"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="144"/>
         <source>Failed to save file</source>
         <translation>保存文件失败</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="89"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="90"/>
         <source>Could not open file %1 for writing.</source>
         <translation>无法打开要写入的 %1 文件。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="111"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="112"/>
         <source>Downloading...</source>
         <translation>正在下载...</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="111"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="112"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="129"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="130"/>
         <source>Could not write to file %1.</source>
         <translation>无法写入到文件 %1。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="144"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="145"/>
         <source>Could not commit to file %1.</source>
         <translation>无法提交到文件 %1。</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="156"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="157"/>
         <source>Failed to download file</source>
         <translation>下载文件失败</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="157"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="158"/>
         <source>Could not download from %1%2
 Error code: %3</source>
         <translation>无法从 %1%2 下载
 错误代码: %3</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="170"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="171"/>
         <source>Download Complete</source>
         <translation>下载完成</translation>
     </message>
     <message>
-        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="171"/>
+        <location filename="../../src/yuzu/updater/update_dialog.cpp" line="172"/>
         <source>Successfully downloaded %1. Would you like to open it?</source>
         <translation>已成功下载 %1。您要打开它吗?</translation>
     </message>
