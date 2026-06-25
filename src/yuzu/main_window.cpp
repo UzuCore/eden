@@ -579,9 +579,12 @@ MainWindow::MainWindow(bool has_broken_vulkan)
         } else if (should_launch_qlaunch) {
             LaunchFirmwareApplet(u64(Service::AM::AppletProgramId::QLaunch), std::nullopt);
         } else if (should_launch_hlaunch) {
-            std::filesystem::path const sd_dir = Common::FS::GetEdenPathString(Common::FS::EdenPath::SDMCDir);
+            std::filesystem::path const sd_dir =
+                Common::FS::GetEdenPathString(Common::FS::EdenPath::SDMCDir);
             auto const hbl_path = (sd_dir / "atmosphere" / "hbl.nsp").string();
-            BootGame(QString::fromStdString(hbl_path), ApplicationAppletParameters());
+            BootGame(
+                QString::fromStdString(hbl_path),
+                LibraryAppletParameters(0x010000000000100Dull, Service::AM::AppletId::QLaunch));
         }
     }
 }
@@ -1088,10 +1091,9 @@ void MainWindow::InitializeWidgets() {
     aa_status_button->setFocusPolicy(Qt::NoFocus);
     connect(aa_status_button, &QPushButton::clicked, [&] {
         auto aa_mode = Settings::values.anti_aliasing.GetValue();
-        aa_mode = static_cast<Settings::AntiAliasing>(static_cast<u32>(aa_mode) + 1);
-        if (aa_mode == Settings::AntiAliasing::MaxEnum) {
-            aa_mode = Settings::AntiAliasing::None;
-        }
+        aa_mode = Settings::AntiAliasing(u32(aa_mode) + 1);
+        if (u32(aa_mode) > u32(Settings::EnumMetadata<Settings::AntiAliasing>::GetLast()))
+            aa_mode = Settings::EnumMetadata<Settings::AntiAliasing>::GetFirst();
         Settings::values.anti_aliasing.SetValue(aa_mode);
         aa_status_button->setChecked(true);
         UpdateAAText();
@@ -1527,6 +1529,7 @@ void MainWindow::ConnectMenuEvents() {
 
     connect_menu(ui->action_Grid_View, &MainWindow::SetGridView);
     connect_menu(ui->action_Tree_View, &MainWindow::SetTreeView);
+    connect_menu(ui->action_Carousel_View, &MainWindow::SetCarouselView);
 
     game_size_actions = new QActionGroup(this);
     game_size_actions->setExclusive(true);
@@ -1546,6 +1549,8 @@ void MainWindow::ConnectMenuEvents() {
             if (checked) {
                 UISettings::values.game_icon_size.SetValue(size);
                 CheckIconSize();
+
+                game_list->UpdateIconSizes();
                 game_list->RefreshGameDirectory();
             }
         });
@@ -3313,9 +3318,10 @@ void MainWindow::ResetWindowSize1080() {
 void MainWindow::SetGameListMode(Settings::GameListMode mode) {
     ui->action_Grid_View->setChecked(mode == Settings::GameListMode::GridView);
     ui->action_Tree_View->setChecked(mode == Settings::GameListMode::TreeView);
+    ui->action_Carousel_View->setChecked(mode == Settings::GameListMode::CarouselView);
 
     UISettings::values.game_list_mode = mode;
-    ui->action_Show_Game_Name->setEnabled(mode == Settings::GameListMode::GridView);
+    ui->action_Show_Game_Name->setEnabled(mode != Settings::GameListMode::TreeView);
 
     CheckIconSize();
     game_list->ResetViewMode();
@@ -3329,11 +3335,15 @@ void MainWindow::SetTreeView() {
     SetGameListMode(Settings::GameListMode::TreeView);
 }
 
+void MainWindow::SetCarouselView() {
+    SetGameListMode(Settings::GameListMode::CarouselView);
+}
+
 void MainWindow::CheckIconSize() {
-    // When in grid view mode, with text off
-    // there is no point in having icons turned off..
+    // When in grid/carousel view mode, with text off
+    // there is no point in having icons turned off
     auto actions = game_size_actions->actions();
-    if (UISettings::values.game_list_mode.GetValue() == Settings::GameListMode::GridView &&
+    if (UISettings::values.game_list_mode.GetValue() != Settings::GameListMode::TreeView &&
         !UISettings::values.show_game_name.GetValue()) {
         u32 newSize = UISettings::values.game_icon_size.GetValue();
         if (newSize == 0) {
@@ -3364,6 +3374,7 @@ void MainWindow::ToggleShowGameName() {
 
     CheckIconSize();
 
+    game_list->UpdateIconSizes();
     game_list->RefreshGameDirectory();
 }
 
@@ -3623,10 +3634,9 @@ void MainWindow::OnIncreaseVolume() {
 
 void MainWindow::OnToggleAdaptingFilter() {
     auto filter = Settings::values.scaling_filter.GetValue();
-    filter = static_cast<Settings::ScalingFilter>(static_cast<u32>(filter) + 1);
-    if (filter == Settings::ScalingFilter::MaxEnum) {
-        filter = Settings::ScalingFilter::NearestNeighbor;
-    }
+    filter = Settings::ScalingFilter(u32(filter) + 1);
+    if (u32(filter) > u32(Settings::EnumMetadata<Settings::ScalingFilter>::GetLast()))
+        filter = Settings::EnumMetadata<Settings::ScalingFilter>::GetFirst();
     Settings::values.scaling_filter.SetValue(filter);
     filter_status_button->setChecked(true);
     UpdateFilterText();
@@ -3870,6 +3880,7 @@ void MainWindow::OnGameListRefresh() {
     // Resets metadata cache and reloads
     QtCommon::Game::ResetMetadata(false);
     game_list->RefreshGameDirectory();
+    game_list->RefreshExternalContent();
     SetFirmwareVersion();
 }
 

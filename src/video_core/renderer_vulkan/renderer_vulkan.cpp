@@ -89,11 +89,10 @@ std::string BuildCommaSeparatedExtensions(
 
 } // Anonymous namespace
 
-Device CreateDevice(const vk::Instance& instance, const vk::InstanceDispatch& dld,
-                    VkSurfaceKHR surface) {
+Device CreateDevice(const vk::Instance& instance, const vk::InstanceDispatch& dld, VkSurfaceKHR surface) {
     const std::vector<VkPhysicalDevice> devices = instance.EnumeratePhysicalDevices();
-    const s32 device_index = Settings::values.vulkan_device.GetValue();
-    if (device_index < 0 || device_index >= static_cast<s32>(devices.size())) {
+    const u32 device_index = Settings::values.vulkan_device.GetValue();
+    if (device_index >= u32(devices.size())) {
         LOG_ERROR(Render_Vulkan, "Invalid device index {}!", device_index);
         throw vk::Exception(VK_ERROR_INITIALIZATION_FAILED);
     }
@@ -189,7 +188,7 @@ void RendererVulkan::Composite(std::span<const Tegra::FramebufferConfig> framebu
     Frame* frame = present_manager.GetRenderFrame();
 
     scheduler.RequestOutsideRenderPassOperationContext();
-    blit_swapchain.DrawToFrame(rasterizer, frame, framebuffers,
+    blit_swapchain.DrawToFrame(device, rasterizer, frame, framebuffers,
                                render_window.GetFramebufferLayout(), swapchain.GetImageCount(),
                                swapchain.GetImageViewFormat());
     scheduler.Flush(*frame->render_ready);
@@ -227,12 +226,12 @@ vk::Buffer RendererVulkan::RenderToBuffer(std::span<const Tegra::FramebufferConf
         f.image =
             CreateWrappedImage(memory_allocator, VkExtent2D{layout.width, layout.height}, format);
         f.image_view = CreateWrappedImageView(device, f.image, format);
-        f.framebuffer = blit_capture.CreateFramebuffer(layout, *f.image_view, format);
+        f.framebuffer = blit_capture.CreateFramebuffer(device, layout, *f.image_view, format);
         return f;
     }();
 
     auto dst_buffer = CreateWrappedBuffer(memory_allocator, buffer_size, MemoryUsage::Download);
-    blit_capture.DrawToFrame(rasterizer, &frame, framebuffers, layout, 1, format);
+    blit_capture.DrawToFrame(device, rasterizer, &frame, framebuffers, layout, 1, format);
 
     scheduler.RequestOutsideRenderPassOperationContext();
     scheduler.Record([&](vk::CommandBuffer cmdbuf) {
@@ -296,12 +295,12 @@ void RendererVulkan::RenderAppletCaptureLayer(
     if (!applet_frame.image) {
         applet_frame.image = CreateWrappedImage(memory_allocator, CaptureImageSize, CaptureFormat);
         applet_frame.image_view = CreateWrappedImageView(device, applet_frame.image, CaptureFormat);
-        applet_frame.framebuffer = blit_applet.CreateFramebuffer(
+        applet_frame.framebuffer = blit_applet.CreateFramebuffer(device,
             VideoCore::Capture::Layout, *applet_frame.image_view, CaptureFormat);
     }
 
     scheduler.RequestOutsideRenderPassOperationContext();
-    blit_applet.DrawToFrame(rasterizer, &applet_frame, framebuffers, VideoCore::Capture::Layout, 1,
+    blit_applet.DrawToFrame(device, rasterizer, &applet_frame, framebuffers, VideoCore::Capture::Layout, 1,
                             CaptureFormat);
 }
 
