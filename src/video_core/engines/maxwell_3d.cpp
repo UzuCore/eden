@@ -208,9 +208,6 @@ void Maxwell3D::ProcessMacro(Core::System& system, u32 method, const u32* base_s
     }
 
     macro_params.insert(macro_params.end(), base_start, base_start + amount);
-    for (size_t i = 0; i < amount; i++) {
-        macro_addresses.push_back(current_dma_segment + i * sizeof(u32));
-    }
     macro_segments.emplace_back(current_dma_segment, amount);
     current_macro_dirty |= current_dirty;
     current_dirty = false;
@@ -220,7 +217,6 @@ void Maxwell3D::ProcessMacro(Core::System& system, u32 method, const u32* base_s
         ConsumeSink(system);
         CallMacroMethod(system, executing_macro, macro_params);
         macro_params.clear();
-        macro_addresses.clear();
         macro_segments.clear();
         current_macro_dirty = false;
     }
@@ -440,6 +436,14 @@ void Maxwell3D::CallMultiMethod(Core::System& system, u32 method, const u32* bas
         upload_state.ProcessData(base_start, amount);
         return;
     }
+    case MAXWELL3D_REG_INDEX(draw_inline_index):
+    case MAXWELL3D_REG_INDEX(inline_index_2x16.even):
+    case MAXWELL3D_REG_INDEX(inline_index_4x8.index0):
+        if (shadow_state.shadow_ram_control != Regs::ShadowRamControl::Replay) {
+            ProcessInlineIndexMultiData(method, base_start, amount);
+            break;
+        }
+        [[fallthrough]];
     default:
         for (u32 i = 0; i < amount; i++) {
             CallMethod(system, method, base_start[i], methods_pending - i <= 1);
@@ -624,6 +628,15 @@ void Maxwell3D::ProcessCBMultiData(const u32* start_base, u32 amount) {
 
 void Maxwell3D::ProcessCBData(u32 value) {
     ProcessCBMultiData(&value, 1);
+}
+
+void Maxwell3D::ProcessInlineIndexMultiData(u32 method, const u32* start_base, u32 amount) {
+    if (amount == 0) {
+        return;
+    }
+    const u32 argument = ProcessShadowRam(method, start_base[amount - 1]);
+    ProcessDirtyRegisters(method, argument);
+    draw_manager.SetInlineIndexBuffer(*this, method, start_base, amount);
 }
 
 Texture::TICEntry Maxwell3D::GetTICEntry(u32 tic_index) const {

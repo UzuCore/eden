@@ -268,6 +268,7 @@ GraphicsPipeline::GraphicsPipeline(
         num_textures += Shader::NumDescriptors(info->texture_descriptors);
         num_image_elements += Shader::NumDescriptors(info->texture_descriptors);
         num_image_elements += Shader::NumDescriptors(info->image_descriptors);
+        num_descriptor_entries += NumDescriptorEntries(*info);
     }
     fragment_has_color0_output = stage_infos[NUM_STAGES - 1].stores_frag_color[0];
     auto func{[this, shader_notify, &render_pass_cache, &descriptor_pool, pipeline_statistics] {
@@ -473,7 +474,7 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
     buffer_cache.UpdateGraphicsBuffers(is_indexed);
     buffer_cache.BindHostGeometryBuffers(is_indexed);
 
-    guest_descriptor_queue.Acquire();
+    guest_descriptor_queue.Acquire(scheduler, num_descriptor_entries);
 
     RescalingPushConstant rescaling;
     RenderAreaPushConstant render_area;
@@ -532,7 +533,7 @@ void GraphicsPipeline::ConfigureDraw(const RescalingPushConstant& rescaling,
     const bool bind_pipeline{scheduler.UpdateGraphicsPipeline(this)};
 
     // Log graphics pipeline binding
-    if (bind_pipeline && Settings::values.gpu_logging_enabled.GetValue() &&
+    if (bind_pipeline && GPU::Logging::IsActive() &&
         Settings::values.gpu_log_vulkan_calls.GetValue()) {
         const std::string pipeline_info = fmt::format("hash=0x{:016x}", key.Hash());
         GPU::Logging::GPULogger::GetInstance().LogPipelineBind(false, pipeline_info);
@@ -986,7 +987,7 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
     }, *pipeline_cache);
 
     // Log graphics pipeline creation
-    if (Settings::values.gpu_logging_enabled.GetValue()) {
+    if (GPU::Logging::IsActive()) {
         const std::string pipeline_info = fmt::format(
             "GraphicsPipeline created: stages={}, attachments={}",
             shader_stages.size(),

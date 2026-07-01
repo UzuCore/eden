@@ -326,6 +326,9 @@ struct System::Impl {
 
         LOG_INFO(Core, "Loading {} ({:016X}) ...", name, params.program_id);
 
+        // Expose program id to dump sites and other global readers.
+        Settings::SetCurrentProgramID(params.program_id);
+
         // Track launch time for frontend launches
         LaunchTimestampCache::SaveLaunchTimestamp(params.program_id);
 
@@ -347,7 +350,7 @@ struct System::Impl {
 
         // Register with applet manager
         // All threads are started, begin main process execution, now that we're in the clear
-        applet_manager.CreateAndInsertByFrontendAppletParameters(std::make_unique<Service::Process>(*std::move(process)), params);
+        applet_manager.CreateAndInsertByFrontendAppletParameters(std::move(process), params);
 
         if (Settings::values.gamecard_inserted) {
             if (Settings::values.gamecard_current_game) {

@@ -155,15 +155,14 @@ void Scheduler::WaitWorker() {
 }
 
 void Scheduler::DispatchWork() {
-    if (chunk->Empty()) {
-        return;
+    if (chunk && !chunk->Empty()) {
+        {
+            std::scoped_lock ql{queue_mutex};
+            work_queue.push(std::move(chunk));
+        }
+        event_cv.notify_all();
+        AcquireNewChunk();
     }
-    {
-        std::scoped_lock ql{queue_mutex};
-        work_queue.push(std::move(chunk));
-    }
-    event_cv.notify_all();
-    AcquireNewChunk();
 }
 
 void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
@@ -181,7 +180,7 @@ void Scheduler::RequestRenderpass(const Framebuffer* framebuffer) {
     state.render_area = render_area;
 
     // Log render pass begin
-    if (Settings::values.gpu_logging_enabled.GetValue() &&
+    if (GPU::Logging::IsActive() &&
         Settings::values.gpu_log_vulkan_calls.GetValue()) {
         const std::string render_pass_info = fmt::format(
             "renderArea={}x{}, numImages={}",
@@ -292,7 +291,7 @@ u64 Scheduler::SubmitExecution(VkSemaphore signal_semaphore, VkSemaphore wait_se
                     cmdbuf, upload_cmdbuf, signal_semaphore, wait_semaphore, signal_value)) {
         case VK_SUCCESS:
             // Log successful queue submission
-            if (Settings::values.gpu_logging_enabled.GetValue() &&
+            if (GPU::Logging::IsActive() &&
                 Settings::values.gpu_log_vulkan_calls.GetValue()) {
                 GPU::Logging::GPULogger::GetInstance().LogVulkanCall(
                     "vkQueueSubmit", "", VK_SUCCESS);
@@ -335,7 +334,7 @@ void Scheduler::EndRenderPass()
         query_cache->CounterClose(VideoCommon::QueryType::StreamingByteCount);
 
         // Log render pass end
-        if (Settings::values.gpu_logging_enabled.GetValue() &&
+        if (GPU::Logging::IsActive() &&
             Settings::values.gpu_log_vulkan_calls.GetValue()) {
             GPU::Logging::GPULogger::GetInstance().LogRenderPassEnd();
         }
