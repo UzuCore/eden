@@ -499,8 +499,6 @@
     <string name="fast_gpu_time_description">Принудительно запускает большинство игр в их максимальном нативном разрешении. Используйте значение 256 для максимальной производительности и 512 для максимального качества графики.</string>
     <string name="skip_cpu_inner_invalidation">Пропустить внутреннюю инвалидацию ЦП</string>
     <string name="skip_cpu_inner_invalidation_description">Пропускает некоторые инвалидации кэша на стороне ЦП при обновлениях памяти, уменьшая нагрузку на процессор и повышая производительность. Может вызывать сбои в некоторых играх.</string>
-    <string name="antiflicker">Анти-мерцание</string>
-    <string name="antiflicker_description">Принудительно заставляет обратные вызовы ГПУ-фильтра ожидать выполнения отправленных задач на ГПУ. Используйте с Быстрым режимом ГПУ, что бы избежать мерцаний с меньшим влиянием на производительность.</string>
     <string name="fix_bloom_effects">Исправить эффекты размытия</string>
     <string name="fix_bloom_effects_description">Частично убирает размытие в LA/EOW (Adreno A6XX - A7XX/ Turnip), полностью отключает его в Burnout. Внимание: может вызывать графические артефакты в других играх.</string>
     <string name="emulate_bgr565">Эмулировать BGR565</string>
@@ -566,8 +564,6 @@
     <string name="gpu_log_level_description">Уровень детализации логов ГПУ (больше значение = больше деталей, выше нагрузка)</string>
     <string name="gpu_log_vulkan_calls">Записывать вызовы Vulkan API</string>
     <string name="gpu_log_vulkan_calls_description">Отслеживать все вызовы Vulkan API в кольцевом буфере</string>
-    <string name="gpu_log_shader_dumps">Выгрузить шейдеры</string>
-    <string name="gpu_log_shader_dumps_description">Сохранять скомпилированные SPIR-V шейдеры в файлы</string>
     <string name="gpu_log_memory_tracking">Отслеживать память ГПУ</string>
     <string name="gpu_log_memory_tracking_description">Мониторить выделение и освобождение памяти ГПУ</string>
     <string name="gpu_log_driver_debug">Отладочная информация драйвера</string>

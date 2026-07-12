@@ -36,10 +36,13 @@
 #include <frontend_common/content_manager.h>
 #include <jni.h>
 
+extern "C" {
+#include <libavcodec/jni.h>
+}
+
 #include "common/android/multiplayer/multiplayer.h"
 #include "common/android/android_common.h"
 #include "common/android/id_cache.h"
-#include "common/detached_tasks.h"
 #include "common/dynamic_library.h"
 #include "common/fs/path_util.h"
 #include "common/logging.h"
@@ -352,7 +355,6 @@ void EmulationSession::ShutdownEmulation() {
     if (m_load_result == Core::SystemResultStatus::Success) {
         m_system.DetachDebugger();
         m_system.ShutdownMainProcess();
-        m_detached_tasks.WaitForAllTasks();
         m_load_result = Core::SystemResultStatus::ErrorNotInitialized;
         m_window.reset();
         OnEmulationStopped(Core::SystemResultStatus::Success);
@@ -679,6 +681,13 @@ const char* fallback_cpu_detection() {
 }
 
 } // namespace
+
+extern "C" {
+jint InitFFmpegOnLoad(JavaVM* vm) {
+    av_jni_set_java_vm(vm, nullptr);
+    return 0;
+}
+}
 
 extern "C" {
 

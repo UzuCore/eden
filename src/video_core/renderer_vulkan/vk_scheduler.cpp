@@ -27,8 +27,6 @@
 
 namespace Vulkan {
 
-constexpr u64 MAX_PENDING_FLUSHES = 5;
-
 void Scheduler::CommandChunk::ExecuteAll(vk::CommandBuffer cmdbuf,
                                          vk::CommandBuffer upload_cmdbuf) {
     auto command = first;
@@ -49,85 +47,15 @@ Scheduler::Scheduler(const Device& device_, StateTracker& state_tracker_)
       master_semaphore{std::make_unique<MasterSemaphore>(device)},
       command_pool{std::make_unique<CommandPool>(*master_semaphore, device)} {
 
-    /*// PRE-OPTIMIZATION: Warm up the pool to prevent mid-frame spikes
-    {
-        std::scoped_lock rl{reserve_mutex};
-        chunk_reserve.reserve(2048); // Prevent vector resizing
-        for (int i = 0; i < 1024; ++i) {
-            chunk_reserve.push_back(std::make_unique<CommandChunk>());
-        }
-    }*/
-
     AcquireNewChunk();
     AllocateWorkerCommandBuffer();
-    worker_thread = std::jthread([this](std::stop_token stop_token) {
-        Common::SetCurrentThreadName("VulkanWorker");
-        const auto TryPopQueue{[this](auto& work) -> bool {
-            if (work_queue.empty()) {
-                return false;
-            }
-
-            work = std::move(work_queue.front());
-            work_queue.pop();
-            event_cv.notify_all();
-            return true;
-        }};
-
-        while (!stop_token.stop_requested()) {
-            std::unique_ptr<CommandChunk> work;
-
-            {
-                std::unique_lock lk{queue_mutex};
-
-                // Wait for work.
-                event_cv.wait(lk, stop_token, [&] { return TryPopQueue(work); });
-
-                // If we've been asked to stop, we're done.
-                if (stop_token.stop_requested()) {
-                    return;
-                }
-
-                // Exchange lock ownership so that we take the execution lock before
-                // the queue lock goes out of scope. This allows us to force execution
-                // to complete in the next step.
-                std::exchange(lk, std::unique_lock{execution_mutex});
-
-                // Perform the work, tracking whether the chunk was a submission
-                // before executing.
-                const bool has_submit = work->HasSubmit();
-                work->ExecuteAll(current_cmdbuf, current_upload_cmdbuf);
-
-                // If the chunk was a submission, reallocate the command buffer.
-                if (has_submit) {
-                    AllocateWorkerCommandBuffer();
-                }
-            }
-
-            {
-                std::scoped_lock rl{reserve_mutex};
-
-                // Recycle the chunk back to the reserve.
-                chunk_reserve.emplace_back(std::move(work));
-            }
-        }
-    });
+    worker_thread = std::jthread([this](std::stop_token token) { WorkerThread(token); });
 }
 
 Scheduler::~Scheduler() = default;
 
 u64 Scheduler::Flush(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore) {
-    // Prevent the CPU from getting too far ahead of the GPU by limiting pending flushes.
-    const bool should_throttle = Settings::IsGPULevelHigh();
-    if (should_throttle) {
-        const u64 current_tick = master_semaphore->CurrentTick();
-        const u64 gap = current_tick > last_submitted_tick ? current_tick - last_submitted_tick : 0;
-        const u64 step = (std::min)(MAX_PENDING_FLUSHES, gap);
-        const u64 new_tick = last_submitted_tick + step;
-        if (new_tick < current_tick) {
-            last_submitted_tick = new_tick;
-            master_semaphore->Wait(last_submitted_tick);
-        }
-    }
+    // When flushing, we only send data to the worker thread; no waiting is necessary.
     const u64 signal_value = SubmitExecution(signal_semaphore, wait_semaphore);
     AllocateNewContext();
     return signal_value;
@@ -248,6 +176,59 @@ bool Scheduler::UpdateRescaling(bool is_rescaling) {
     return true;
 }
 
+void Scheduler::WorkerThread(std::stop_token stop_token) {
+    Common::SetCurrentThreadName("VulkanWorker");
+
+    const auto TryPopQueue{[this](auto& work) -> bool {
+        if (work_queue.empty()) {
+            return false;
+        }
+
+        work = std::move(work_queue.front());
+        work_queue.pop();
+        event_cv.notify_all();
+        return true;
+    }};
+
+    while (!stop_token.stop_requested()) {
+        std::unique_ptr<CommandChunk> work;
+
+        {
+            std::unique_lock lk{queue_mutex};
+
+            // Wait for work.
+            event_cv.wait(lk, stop_token, [&] { return TryPopQueue(work); });
+
+            // If we've been asked to stop, we're done.
+            if (stop_token.stop_requested()) {
+                return;
+            }
+
+            // Exchange lock ownership so that we take the execution lock before
+            // the queue lock goes out of scope. This allows us to force execution
+            // to complete in the next step.
+            std::exchange(lk, std::unique_lock{execution_mutex});
+
+            // Perform the work, tracking whether the chunk was a submission
+            // before executing.
+            const bool has_submit = work->HasSubmit();
+            work->ExecuteAll(current_cmdbuf, current_upload_cmdbuf);
+
+            // If the chunk was a submission, reallocate the command buffer.
+            if (has_submit) {
+                AllocateWorkerCommandBuffer();
+            }
+        }
+
+        {
+            std::scoped_lock rl{reserve_mutex};
+
+            // Recycle the chunk back to the reserve.
+            chunk_reserve.emplace_back(std::move(work));
+        }
+    }
+}
+
 void Scheduler::AllocateWorkerCommandBuffer() {
     current_cmdbuf = vk::CommandBuffer(command_pool->Commit(), device.GetDispatchLoader());
     current_cmdbuf.Begin({
@@ -344,7 +325,9 @@ void Scheduler::EndRenderPass()
 
         Record([num_images = num_renderpass_images,
                        images = renderpass_images,
-                       ranges = renderpass_image_ranges](vk::CommandBuffer cmdbuf) {
+                       ranges = renderpass_image_ranges,
+                       has_transform_feedback = device.IsExtTransformFeedbackSupported()](
+                          vk::CommandBuffer cmdbuf) {
             std::array<VkImageMemoryBarrier, 9> barriers;
             for (size_t i = 0; i < num_images; ++i) {
                 const VkImageSubresourceRange& range = ranges[i];
@@ -384,6 +367,17 @@ void Scheduler::EndRenderPass()
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
                                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, vk::PIPELINE_STAGE_GRAPHICS_COMPUTE,
                                    0, nullptr, nullptr, vk::Span(barriers.data(), num_images));
+            if (has_transform_feedback) {
+                static constexpr VkMemoryBarrier XFB_OUTPUT_BARRIER{
+                    .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+                    .pNext = nullptr,
+                    .srcAccessMask = VK_ACCESS_TRANSFORM_FEEDBACK_WRITE_BIT_EXT,
+                    .dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT,
+                };
+                cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT,
+                                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                       0, XFB_OUTPUT_BARRIER);
+            }
         });
 
         state.renderpass = VkRenderPass{};

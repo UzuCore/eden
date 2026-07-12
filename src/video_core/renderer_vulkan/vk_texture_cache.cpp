@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <span>
 #include <memory>
 #include <vector>
@@ -128,9 +129,32 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
     return usage;
 }
 
-[[nodiscard]] VkImageCreateInfo MakeImageCreateInfo(const Device& device, const ImageInfo& info) {
-    const auto format_info =
+[[nodiscard]] bool WillUseAcceleratedAstcDecode(const Device& device, const ImageInfo& info) {
+    if (!IsPixelFormatASTC(info.format) || device.IsOptimalAstcSupported()) {
+        return false;
+    }
+    if (Settings::values.accelerate_astc.GetValue() != Settings::AstcDecodeMode::Gpu) {
+        return false;
+    }
+    return Settings::values.astc_recompression.GetValue() ==
+              Settings::AstcRecompression::Uncompressed &&
+          info.size.depth == 1;
+}
+
+[[nodiscard]] bool WillUseWidenedAstcFormat(const Device& device, const ImageInfo& info) {
+    return WillUseAcceleratedAstcDecode(device, info) &&
+           !VideoCore::Surface::IsPixelFormatSRGB(info.format);
+}
+
+[[nodiscard]] VkImageCreateInfo MakeImageCreateInfo(const Device& device, const ImageInfo& info,
+                                                    std::optional<VkFormat> format_override = {}) {
+    auto format_info =
         MaxwellToVK::SurfaceFormat(device, FormatType::Optimal, false, info.format);
+    if (format_override) {
+        format_info.format = *format_override;
+        format_info.attachable = false;
+        format_info.storage = true;
+    }
     VkImageCreateFlags flags{};
     if (info.type == ImageType::e2D && info.resources.layers >= 6 &&
         info.size.width == info.size.height && !device.HasBrokenCubeImageCompatibility()) {
@@ -164,11 +188,12 @@ constexpr VkBorderColor ConvertBorderColor(const std::array<float, 4>& color) {
 }
 
 [[nodiscard]] vk::Image MakeImage(const Device& device, const MemoryAllocator& allocator,
-                                  const ImageInfo& info, std::span<const VkFormat> view_formats) {
+                                  const ImageInfo& info, std::span<const VkFormat> view_formats,
+                                  std::optional<VkFormat> format_override = {}) {
     if (info.type == ImageType::Buffer) {
         return vk::Image{};
     }
-    VkImageCreateInfo image_ci = MakeImageCreateInfo(device, info);
+    VkImageCreateInfo image_ci = MakeImageCreateInfo(device, info, format_override);
     const VkImageFormatListCreateInfo image_format_list = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO,
         .pNext = nullptr,
@@ -909,40 +934,6 @@ TextureCacheRuntime::TextureCacheRuntime(const Device& device_, Scheduler& sched
         bl3d_unswizzle_pass.emplace(device, scheduler, descriptor_pool,
                                    staging_buffer_pool, compute_pass_descriptor_queue);
     }
-
-    // --- Create swizzle table buffer ---
-    {
-        auto table = Tegra::Texture::MakeSwizzleTable();
-
-        swizzle_table_size = static_cast<VkDeviceSize>(table.size() * sizeof(table[0]));
-
-        auto staging = staging_buffer_pool.Request(swizzle_table_size, MemoryUsage::Upload);
-        std::memcpy(staging.mapped_span.data(), table.data(), static_cast<size_t>(swizzle_table_size));
-
-        VkBufferCreateInfo ci{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = swizzle_table_size,
-            .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                     VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        };
-        swizzle_table_buffer = memory_allocator.CreateBuffer(ci, MemoryUsage::DeviceLocal);
-
-        scheduler.RequestOutsideRenderPassOperationContext();
-        scheduler.Record([staging_buf = staging.buffer,
-                          dst_buf = *swizzle_table_buffer,
-                          size = swizzle_table_size,
-                          src_off = staging.offset](vk::CommandBuffer cmdbuf) {
-
-            const VkBufferCopy region{
-                .srcOffset = src_off,
-                .dstOffset = 0,
-                .size = size,
-            };
-            cmdbuf.CopyBuffer(staging_buf, dst_buf, region);
-        });
-    }
 }
 
 void TextureCacheRuntime::Finish() {
@@ -1333,7 +1324,9 @@ void TextureCacheRuntime::ConvertImage(Framebuffer* dst, ImageView& dst_view, Im
     case PixelFormat::R32G32_FLOAT:
     case PixelFormat::R32G32_SINT:
     case PixelFormat::R32_FLOAT:
-        if ((src_view.format == PixelFormat::D32_FLOAT) && Settings::values.fix_bloom_effects.GetValue()) {
+        if (src_view.format == PixelFormat::D32_FLOAT &&
+            (dst_view.format == PixelFormat::B5G6R5_UNORM ||
+             Settings::values.fix_bloom_effects.GetValue())) {
             const Region2D region{
                 .start = {0, 0},
                 .end = {static_cast<s32>(dst->RenderArea().width),
@@ -1589,15 +1582,19 @@ void TextureCacheRuntime::TickFrame() {}
 Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu_addr_,
              VAddr cpu_addr_)
     : VideoCommon::ImageBase(info_, gpu_addr_, cpu_addr_), scheduler{&runtime_.scheduler},
-      runtime{&runtime_}, original_image(MakeImage(runtime_.device, runtime_.memory_allocator, info,
-                                                   runtime->ViewFormats(info.format))),
+      runtime{&runtime_},
+      original_image(MakeImage(runtime_.device, runtime_.memory_allocator, info,
+                               WillUseWidenedAstcFormat(runtime_.device, info)
+                                   ? std::span<const VkFormat>{}
+                                   : runtime->ViewFormats(info.format),
+                               WillUseWidenedAstcFormat(runtime_.device, info)
+                                   ? std::make_optional(VK_FORMAT_R32G32B32A32_SFLOAT)
+                                   : std::nullopt)),
       aspect_mask(ImageAspectMask(info.format)) {
     if (IsPixelFormatASTC(info.format) && !runtime->device.IsOptimalAstcSupported()) {
         switch (Settings::values.accelerate_astc.GetValue()) {
         case Settings::AstcDecodeMode::Gpu:
-            if (Settings::values.astc_recompression.GetValue() ==
-                    Settings::AstcRecompression::Uncompressed &&
-                info.size.depth == 1) {
+            if (WillUseAcceleratedAstcDecode(runtime->device, info)) {
                 flags |= VideoCommon::ImageFlagBits::AcceleratedUpload;
             }
             break;
@@ -1623,9 +1620,12 @@ Image::Image(TextureCacheRuntime& runtime_, const ImageInfo& info_, GPUVAddr gpu
         Settings::values.astc_recompression.GetValue() ==
             Settings::AstcRecompression::Uncompressed) {
         const auto& device = runtime->device.GetLogical();
+        const VkFormat storage_format = WillUseWidenedAstcFormat(runtime->device, info)
+                                            ? VK_FORMAT_R32G32B32A32_SFLOAT
+                                            : VK_FORMAT_A8B8G8R8_UNORM_PACK32;
         for (s32 level = 0; level < info.resources.levels; ++level) {
             storage_image_views[level] =
-                MakeStorageView(device, level, *original_image, VK_FORMAT_A8B8G8R8_UNORM_PACK32);
+                MakeStorageView(device, level, *original_image, storage_format);
         }
     }
 }
@@ -1635,9 +1635,6 @@ Image::Image(const VideoCommon::NullImageParams& params) : VideoCommon::ImageBas
 Image::~Image() = default;
 
 void Image::AllocateComputeUnswizzleBuffer(u32 max_slices) {
-    if (has_compute_unswizzle_buffer)
-        return;
-
     using VideoCore::Surface::BytesPerBlock;
 
     const u32 block_bytes  = BytesPerBlock(info.format); // 8 for BC1, 16 for BC6H
@@ -1654,7 +1651,12 @@ void Image::AllocateComputeUnswizzleBuffer(u32 max_slices) {
         static_cast<u64>(blocks_y) *
         static_cast<u64>(blocks_z);
 
-    compute_unswizzle_buffer_size = block_count * block_bytes;
+    const VkDeviceSize required_size = block_count * block_bytes;
+    if (has_compute_unswizzle_buffer && required_size <= compute_unswizzle_buffer_size) {
+        return;
+    }
+
+    compute_unswizzle_buffer_size = required_size;
 
     VkBufferCreateInfo ci{
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -1974,8 +1976,13 @@ void Image::DownloadMemory(const StagingBufferRef& map, std::span<const BufferIm
 VkImageView Image::StorageImageView(s32 level) noexcept {
     auto& view = storage_image_views[level];
     if (!view) {
-        const auto format_info =
+        auto format_info =
             MaxwellToVK::SurfaceFormat(runtime->device, FormatType::Optimal, true, info.format);
+        if (WillUseAcceleratedAstcDecode(runtime->device, info)) {
+            format_info.format = WillUseWidenedAstcFormat(runtime->device, info)
+                                     ? VK_FORMAT_R32G32B32A32_SFLOAT
+                                     : VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+        }
         view = MakeStorageView(runtime->device.GetLogical(), level, *(this->*current_image),
                                format_info.format);
     }
@@ -2142,7 +2149,20 @@ ImageView::ImageView(TextureCacheRuntime& runtime, const VideoCommon::ImageViewI
             SanitizeDepthStencilSwizzle(swizzle, device->SupportsDepthStencilSwizzleOne());
         }
     }
-    const auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+    uses_widened_astc_format = WillUseWidenedAstcFormat(*device, image.info);
+    auto format_info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+    if (uses_widened_astc_format) {
+        format_info.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    }
+    if (device->ApiVersion() >= VK_API_VERSION_1_3) {
+        const VkFormatProperties3 properties3 =
+            device->GetPhysical().GetFormatProperties3(format_info.format);
+        supports_depth_comparison =
+            (properties3.optimalTilingFeatures &
+             VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT) != 0;
+    } else {
+        supports_depth_comparison = true;
+    }
     const VkImageUsageFlags requested_view_usage = ImageUsageFlags(format_info, format);
     const VkImageUsageFlags image_usage = image.UsageFlags();
     const VkImageUsageFlags clamped_view_usage = requested_view_usage & image_usage;
@@ -2276,7 +2296,14 @@ VkImageView ImageView::StorageView(Shader::TextureType texture_type,
                                    Shader::ImageFormat image_format) {
     if (image_handle) {
         if (image_format == Shader::ImageFormat::Typeless) {
-            return Handle(texture_type);
+            if (!typeless_storage_view) {
+                auto info = MaxwellToVK::SurfaceFormat(*device, FormatType::Optimal, true, format);
+                if (uses_widened_astc_format) {
+                    info.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+                }
+                typeless_storage_view = MakeView(info.format, VK_IMAGE_ASPECT_COLOR_BIT, texture_type);
+            }
+            return *typeless_storage_view;
         }
         const bool is_signed = image_format == Shader::ImageFormat::R8_SINT
             || image_format == Shader::ImageFormat::R16_SINT;
@@ -2285,7 +2312,7 @@ VkImageView ImageView::StorageView(Shader::TextureType texture_type,
         auto& views{is_signed ? storage_views->signeds : storage_views->unsigneds};
         auto& view{views[size_t(texture_type)]};
         if (!view)
-            view = MakeView(Format(image_format), VK_IMAGE_ASPECT_COLOR_BIT);
+            view = MakeView(Format(image_format), VK_IMAGE_ASPECT_COLOR_BIT, texture_type);
         return *view;
     }
     return VK_NULL_HANDLE;
@@ -2295,13 +2322,28 @@ bool ImageView::IsRescaled() const noexcept {
     return (*slot_images)[image_id].IsRescaled();
 }
 
-vk::ImageView ImageView::MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask) {
+vk::ImageView ImageView::MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask,
+                                  std::optional<Shader::TextureType> texture_type) {
+    VkImageViewType view_type = ImageViewType(type);
+    VkImageSubresourceRange subresource_range = MakeSubresourceRange(aspect_mask, range);
+    if (texture_type) {
+        view_type = ImageViewType(*texture_type);
+        switch (view_type) {
+        case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
+        case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+        case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+            break;
+        default:
+            subresource_range.layerCount = 1;
+            break;
+        }
+    }
     return device->GetLogical().CreateImageView({
         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
         .image = image_handle,
-        .viewType = ImageViewType(type),
+        .viewType = view_type,
         .format = vk_format,
         .components{
             .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -2309,7 +2351,7 @@ vk::ImageView ImageView::MakeView(VkFormat vk_format, VkImageAspectFlags aspect_
             .b = VK_COMPONENT_SWIZZLE_IDENTITY,
             .a = VK_COMPONENT_SWIZZLE_IDENTITY,
         },
-        .subresourceRange = MakeSubresourceRange(aspect_mask, range),
+        .subresourceRange = subresource_range,
     });
 }
 
@@ -2331,11 +2373,14 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     const void* pnext = nullptr;
     if (has_custom_border_colors) {
         pnext = &border_ci;
-        // Log extension usage for custom border color
         if (GPU::Logging::IsActive()) {
             GPU::Logging::GPULogger::GetInstance().LogExtensionUsage(
                 "VK_EXT_custom_border_color", "Sampler::Sampler");
         }
+    }
+    if (device.IsExtBorderColorSwizzleSupported() && GPU::Logging::IsActive()) {
+        GPU::Logging::GPULogger::GetInstance().LogExtensionUsage(
+            "VK_EXT_border_color_swizzle", "Sampler::Sampler");
     }
     const VkSamplerReductionModeCreateInfoEXT reduction_ci{
         .sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO_EXT,
@@ -2350,21 +2395,31 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
     // Some games have samplers with garbage. Sanitize them here.
     const f32 max_anisotropy = std::clamp(tsc.MaxAnisotropy(), 1.0f, 16.0f);
 
-    const auto create_sampler = [&](const f32 anisotropy) {
+    const VkFilter mag_filter{MaxwellToVK::Sampler::Filter(tsc.mag_filter)};
+    const VkFilter min_filter{MaxwellToVK::Sampler::Filter(tsc.min_filter)};
+    const VkSamplerMipmapMode mipmap_mode{MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter)};
+    const bool has_linear_filtering{mag_filter == VK_FILTER_LINEAR ||
+                                    min_filter == VK_FILTER_LINEAR ||
+                                    mipmap_mode == VK_SAMPLER_MIPMAP_MODE_LINEAR};
+
+    const auto create_sampler = [&](const f32 anisotropy, bool force_nearest,
+                                    bool disable_compare = false) {
         return device.GetLogical().CreateSampler(VkSamplerCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
             .pNext = pnext,
             .flags = 0,
-            .magFilter = MaxwellToVK::Sampler::Filter(tsc.mag_filter),
-            .minFilter = MaxwellToVK::Sampler::Filter(tsc.min_filter),
-            .mipmapMode = MaxwellToVK::Sampler::MipmapMode(tsc.mipmap_filter),
+            .magFilter = force_nearest ? VK_FILTER_NEAREST : mag_filter,
+            .minFilter = force_nearest ? VK_FILTER_NEAREST : min_filter,
+            .mipmapMode = force_nearest ? VK_SAMPLER_MIPMAP_MODE_NEAREST : mipmap_mode,
             .addressModeU = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_u, tsc.mag_filter),
             .addressModeV = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_v, tsc.mag_filter),
             .addressModeW = MaxwellToVK::Sampler::WrapMode(device, tsc.wrap_p, tsc.mag_filter),
             .mipLodBias = tsc.LodBias(),
-            .anisotropyEnable = static_cast<VkBool32>(anisotropy > 1.0f ? VK_TRUE : VK_FALSE),
-            .maxAnisotropy = anisotropy,
-            .compareEnable = tsc.depth_compare_enabled,
+            .anisotropyEnable =
+                static_cast<VkBool32>(!force_nearest && anisotropy > 1.0f ? VK_TRUE : VK_FALSE),
+            .maxAnisotropy = force_nearest ? 1.0f : anisotropy,
+            .compareEnable = disable_compare ? VK_FALSE
+                                             : static_cast<VkBool32>(tsc.depth_compare_enabled),
             .compareOp = MaxwellToVK::Sampler::DepthCompareFunction(tsc.depth_compare_func),
             .minLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.0f : tsc.MinLod(),
             .maxLod = tsc.mipmap_filter == TextureMipmapFilter::None ? 0.25f : tsc.MaxLod(),
@@ -2374,11 +2429,17 @@ Sampler::Sampler(TextureCacheRuntime& runtime, const Tegra::Texture::TSCEntry& t
         });
     };
 
-    sampler = create_sampler(max_anisotropy);
+    sampler = create_sampler(max_anisotropy, false);
 
     const f32 max_anisotropy_default = static_cast<f32>(1U << tsc.max_anisotropy);
     if (max_anisotropy > max_anisotropy_default) {
-        sampler_default_anisotropy = create_sampler(max_anisotropy_default);
+        sampler_default_anisotropy = create_sampler(max_anisotropy_default, false);
+    }
+    if (has_linear_filtering) {
+        sampler_nearest = create_sampler(1.0f, true);
+    }
+    if (tsc.depth_compare_enabled) {
+        sampler_noncompare = create_sampler(max_anisotropy, false, true);
     }
 }
 
@@ -2484,18 +2545,13 @@ void TextureCacheRuntime::AccelerateImageUpload(
 
     if (!Settings::values.gpu_unswizzle_enabled.GetValue() || !bl3d_unswizzle_pass) {
         if (IsPixelFormatBCn(image.info.format) && image.info.type == ImageType::e3D) {
-            ASSERT_MSG(false, "GPU unswizzle is disabled for BCn 3D texture");
+            ASSERT(false && "GPU unswizzle is disabled for BCn 3D texture");
         }
         ASSERT(false);
         return;
     }
 
-    if (bl3d_unswizzle_pass &&
-        IsPixelFormatBCn(image.info.format) &&
-        image.info.type == ImageType::e3D &&
-        image.info.resources.levels == 1 &&
-        image.info.resources.layers == 1) {
-
+    if (bl3d_unswizzle_pass && IsPixelFormatBCn(image.info.format) && image.info.type == ImageType::e3D && image.info.resources.levels == 1 && image.info.resources.layers == 1) {
         return bl3d_unswizzle_pass->Unswizzle(image, map, swizzles, z_start, z_count);
     }
 

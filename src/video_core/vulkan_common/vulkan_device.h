@@ -43,12 +43,15 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE(EXT, ShaderDemoteToHelperInvocation, SHADER_DEMOTE_TO_HELPER_INVOCATION,               \
             shader_demote_to_helper_invocation)                                                    \
     FEATURE(EXT, SubgroupSizeControl, SUBGROUP_SIZE_CONTROL, subgroup_size_control)                \
-    FEATURE(KHR, Maintenance4, MAINTENANCE_4, maintenance4)
+    FEATURE(KHR, Maintenance4, MAINTENANCE_4, maintenance4)                                        \
+    FEATURE(KHR, Synchronization2, SYNCHRONIZATION_2, synchronization2)
 
 #define FOR_EACH_VK_FEATURE_1_4(FEATURE)
 
 // Define all features which may be used by the implementation and require an extension here.
 #define FOR_EACH_VK_FEATURE_EXT(FEATURE)                                                           \
+    FEATURE(EXT, BorderColorSwizzle, BORDER_COLOR_SWIZZLE, border_color_swizzle)                   \
+    FEATURE(EXT, ColorWriteEnable, COLOR_WRITE_ENABLE, color_write_enable)                         \
     FEATURE(EXT, CustomBorderColor, CUSTOM_BORDER_COLOR, custom_border_color)                      \
     FEATURE(EXT, DepthBiasControl, DEPTH_BIAS_CONTROL, depth_bias_control)                         \
     FEATURE(EXT, DepthClipControl, DEPTH_CLIP_CONTROL, depth_clip_control)                         \
@@ -69,7 +72,9 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE(KHR, PipelineExecutableProperties, PIPELINE_EXECUTABLE_PROPERTIES,                     \
             pipeline_executable_properties)                                                        \
     FEATURE(KHR, WorkgroupMemoryExplicitLayout, WORKGROUP_MEMORY_EXPLICIT_LAYOUT,                  \
-            workgroup_memory_explicit_layout)
+            workgroup_memory_explicit_layout)                                                      \
+    FEATURE(EXT, TextureCompressionASTCHDR, TEXTURE_COMPRESSION_ASTC_HDR,                          \
+            texture_compression_astc_hdr)
 
 
 // Define miscellaneous extensions which may be used by the implementation here.
@@ -180,6 +185,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE_NAME(robustness2, nullDescriptor)                                                      \
     FEATURE_NAME(shader_float16_int8, shaderFloat16)                                               \
     FEATURE_NAME(shader_float16_int8, shaderInt8)                                                  \
+    FEATURE_NAME(synchronization2, synchronization2)                                               \
     FEATURE_NAME(timeline_semaphore, timelineSemaphore)                                            \
     FEATURE_NAME(transform_feedback, transformFeedback)                                            \
     FEATURE_NAME(uniform_buffer_standard_layout, uniformBufferStandardLayout)                      \
@@ -344,9 +350,9 @@ FN_MAX_LIMIT_LIST
         return properties.float_controls;
     }
 
-    /// Returns true if ASTC is natively supported.
     bool IsOptimalAstcSupported() const {
-        return features.features.textureCompressionASTC_LDR;
+        return features.features.textureCompressionASTC_LDR &&
+               features.texture_compression_astc_hdr.textureCompressionASTC_HDR;
     }
 
     /// Returns true if BCn is natively supported.
@@ -383,6 +389,26 @@ FN_MAX_LIMIT_LIST
         return features.shader_float16_int8.shaderInt8;
     }
 
+    /// Returns true if the device allows 8-bit integer members in uniform/storage buffers.
+    bool IsUniformAndStorageBuffer8BitAccessSupported() const {
+        return features.bit8_storage.uniformAndStorageBuffer8BitAccess;
+    }
+
+    /// Returns true if the device allows 16-bit integer members in uniform/storage buffers.
+    bool IsUniformAndStorageBuffer16BitAccessSupported() const {
+        return features.bit16_storage.uniformAndStorageBuffer16BitAccess;
+    }
+
+    /// Returns true if the device supports reading 8-bit values from a storage buffer.
+    bool IsStorageBuffer8BitAccessSupported() const {
+        return features.bit8_storage.storageBuffer8BitAccess;
+    }
+
+    /// Returns true if the device supports reading 16-bit values from a storage buffer.
+    bool IsStorageBuffer16BitAccessSupported() const {
+        return features.bit16_storage.storageBuffer16BitAccess;
+    }
+
     /// Returns true if the device supports binding multisample images as storage images.
     bool IsStorageImageMultisampleSupported() const {
         return features.features.shaderStorageImageMultisample;
@@ -401,6 +427,10 @@ FN_MAX_LIMIT_LIST
     /// Returns true if the device supports the provided subgroup feature.
     bool IsSubgroupFeatureSupported(VkSubgroupFeatureFlagBits feature) const {
         return properties.subgroup_properties.supportedOperations & feature;
+    }
+
+    VkShaderStageFlags GetSubgroupSupportedStages() const {
+        return properties.subgroup_properties.supportedStages;
     }
 
     /// Returns the maximum number of push descriptors.
@@ -509,7 +539,6 @@ FN_MAX_LIMIT_LIST
     }
 
     /// Returns true if the device supports VK_EXT_shader_stencil_export.
-    /// Note: Most Mali/NVIDIA drivers don't support this. Use hardware blits as fallback.
     bool IsExtShaderStencilExportSupported() const {
         return extensions.shader_stencil_export;
     }
@@ -546,6 +575,11 @@ FN_MAX_LIMIT_LIST
         return extensions.subgroup_size_control;
     }
 
+    /// Returns true if vkResetQueryPool (host-side query reset) is supported.
+    bool IsHostQueryResetSupported() const {
+        return features.host_query_reset.hostQueryReset != VK_FALSE;
+    }
+
     /// Returns true if the device supports VK_EXT_transform_feedback.
     bool IsExtTransformFeedbackSupported() const {
         return extensions.transform_feedback;
@@ -580,6 +614,21 @@ FN_MAX_LIMIT_LIST
     /// Returns true if customBorderColorWithoutFormat feature is available.
     bool IsCustomBorderColorWithoutFormatSupported() const {
         return features.custom_border_color.customBorderColorWithoutFormat;
+    }
+
+    /// Returns true if the device supports VK_EXT_color_write_enable.
+    bool IsExtColorWriteEnableSupported() const {
+        return extensions.color_write_enable;
+    }
+
+    /// Returns true if the device supports VK_EXT_border_color_swizzle.
+    bool IsExtBorderColorSwizzleSupported() const {
+        return extensions.border_color_swizzle;
+    }
+
+    /// Returns true if borderColorSwizzleFromImage is available.
+    bool IsBorderColorSwizzleFromImageSupported() const {
+        return features.border_color_swizzle.borderColorSwizzleFromImage;
     }
 
     /// Returns true if the device supports VK_EXT_extended_dynamic_state.
@@ -721,6 +770,11 @@ FN_MAX_LIMIT_LIST
     }
 
     bool HasTimelineSemaphore() const;
+
+    /// Returns true if the device supports VK_KHR_synchronization2.
+    bool HasSynchronization2() const {
+        return extensions.synchronization2;
+    }
 
     /// Returns the minimum supported version of SPIR-V.
     u32 SupportedSpirvVersion() const {

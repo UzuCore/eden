@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
@@ -43,12 +43,14 @@ public:
         return tracker.IsUsed(offset, size);
     }
 
-    void MarkUsage(u64 offset, u64 size) noexcept {
-        tracker.Track(offset, size);
-    }
+    void MarkUsage(u64 offset, u64 size) noexcept;
 
     void ResetUsageTracking() noexcept {
         tracker.Reset();
+    }
+
+    [[nodiscard]] u64 LastUsageTick() const noexcept {
+        return last_usage_tick;
     }
 
     operator VkBuffer() const noexcept {
@@ -64,9 +66,11 @@ private:
     };
 
     const Device* device{};
+    Scheduler* scheduler{};
     vk::Buffer buffer;
     std::vector<BufferView> views;
     VideoCommon::UsageTracker tracker;
+    u64 last_usage_tick{};
     bool is_null{};
 };
 
@@ -87,6 +91,12 @@ public:
                                 DescriptorPool& descriptor_pool);
 
     void TickFrame(Common::SlotVector<Buffer>& slot_buffers) noexcept;
+
+    u64 CurrentTick();
+
+    u64 KnownGpuTick();
+
+    void Wait(u64 buffer_tick);
 
     void Finish();
 
@@ -163,7 +173,11 @@ public:
 
 private:
     void BindBuffer(VkBuffer buffer, u32 offset, u32 size) {
-        guest_descriptor_queue.AddBuffer(buffer, offset, size);
+        if (buffer == VK_NULL_HANDLE) {
+            guest_descriptor_queue.AddBuffer(buffer, 0, VK_WHOLE_SIZE);
+        } else {
+            guest_descriptor_queue.AddBuffer(buffer, offset, size);
+        }
     }
 
     void ReserveNullBuffer();

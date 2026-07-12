@@ -26,6 +26,7 @@
 #include "video_core/host_shaders/vulkan_uint8_comp_spv.h"
 #include "video_core/host_shaders/block_linear_unswizzle_3d_bcn_comp_spv.h"
 #include "video_core/renderer_vulkan/vk_compute_pass.h"
+#include "video_core/surface.h"
 #include "video_core/renderer_vulkan/vk_descriptor_pool.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_staging_buffer_pool.h"
@@ -653,71 +654,8 @@ void ASTCDecoderPass::Assemble(Image& image, const StagingBufferRef& map,
     scheduler.Finish();
 }
 
-constexpr u32 BL3D_BINDING_SWIZZLE_TABLE = 0;
-constexpr u32 BL3D_BINDING_INPUT_BUFFER  = 1;
-constexpr u32 BL3D_BINDING_OUTPUT_BUFFER = 2;
-
-constexpr std::array<VkDescriptorSetLayoutBinding, 3> BL3D_DESCRIPTOR_SET_BINDINGS{{
-    {
-        .binding = BL3D_BINDING_SWIZZLE_TABLE,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // swizzle_table[]
-        .descriptorCount = 1,
-        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .pImmutableSamplers = nullptr,
-    },
-    {
-        .binding = BL3D_BINDING_INPUT_BUFFER,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // block-linear input
-        .descriptorCount = 1,
-        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .pImmutableSamplers = nullptr,
-    },
-    {
-        .binding = BL3D_BINDING_OUTPUT_BUFFER,
-        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-        .descriptorCount = 1,
-        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .pImmutableSamplers = nullptr,
-    },
-}};
-
-constexpr DescriptorBankInfo BL3D_BANK_INFO{
-    .uniform_buffers = 0,
-    .storage_buffers = 3,
-    .texture_buffers = 0,
-    .image_buffers = 0,
-    .textures = 0,
-    .images = 0,
-    .score = 3,
-};
-
-constexpr std::array<VkDescriptorUpdateTemplateEntry, 3>
-    BL3D_DESCRIPTOR_UPDATE_TEMPLATE_ENTRY{{
-        {
-            .dstBinding = BL3D_BINDING_SWIZZLE_TABLE,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .offset = BL3D_BINDING_SWIZZLE_TABLE * sizeof(DescriptorUpdateEntry),
-            .stride = sizeof(DescriptorUpdateEntry),
-        },
-        {
-            .dstBinding = BL3D_BINDING_INPUT_BUFFER,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .offset = BL3D_BINDING_INPUT_BUFFER * sizeof(DescriptorUpdateEntry),
-            .stride = sizeof(DescriptorUpdateEntry),
-        },
-        {
-            .dstBinding = BL3D_BINDING_OUTPUT_BUFFER,
-            .dstArrayElement = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .offset = BL3D_BINDING_OUTPUT_BUFFER * sizeof(DescriptorUpdateEntry),
-            .stride = sizeof(DescriptorUpdateEntry),
-        }
-    }};
+constexpr u32 BL3D_BINDING_INPUT_BUFFER  = 0;
+constexpr u32 BL3D_BINDING_OUTPUT_BUFFER = 1;
 
 struct alignas(16) BlockLinearUnswizzle3DPushConstants {
     u32 blocks_dim[3];           // Offset 0
@@ -745,11 +683,50 @@ BlockLinearUnswizzle3DPass::BlockLinearUnswizzle3DPass(
     DescriptorPool& descriptor_pool_,
     StagingBufferPool& staging_buffer_pool_,
     ComputePassDescriptorQueue& compute_pass_descriptor_queue_)
-    : ComputePass(
-          device_, scheduler_, descriptor_pool_,
-          BL3D_DESCRIPTOR_SET_BINDINGS,
-          BL3D_DESCRIPTOR_UPDATE_TEMPLATE_ENTRY,
-          BL3D_BANK_INFO,
+    : ComputePass(device_, scheduler_, descriptor_pool_,
+        std::array<VkDescriptorSetLayoutBinding, 2>{{
+    {
+        .binding = BL3D_BINDING_INPUT_BUFFER,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, // block-linear input
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .pImmutableSamplers = nullptr,
+    },
+    {
+        .binding = BL3D_BINDING_OUTPUT_BUFFER,
+        .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+        .pImmutableSamplers = nullptr,
+    },
+        }},
+        std::array<VkDescriptorUpdateTemplateEntry, 2>{{
+        {
+            .dstBinding = BL3D_BINDING_INPUT_BUFFER,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .offset = BL3D_BINDING_INPUT_BUFFER * sizeof(DescriptorUpdateEntry),
+            .stride = sizeof(DescriptorUpdateEntry),
+        },
+        {
+            .dstBinding = BL3D_BINDING_OUTPUT_BUFFER,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .offset = BL3D_BINDING_OUTPUT_BUFFER * sizeof(DescriptorUpdateEntry),
+            .stride = sizeof(DescriptorUpdateEntry),
+        }
+        }},
+        DescriptorBankInfo{
+            .uniform_buffers = 0,
+            .storage_buffers = 2,
+            .texture_buffers = 0,
+            .image_buffers = 0,
+            .textures = 0,
+            .images = 0,
+            .score = 2,
+        },
           COMPUTE_PUSH_CONSTANT_RANGE<sizeof(BlockLinearUnswizzle3DPushConstants)>,
           BLOCK_LINEAR_UNSWIZZLE_3D_BCN_COMP_SPV),
       scheduler{scheduler_},
@@ -769,10 +746,8 @@ void BlockLinearUnswizzle3DPass::Unswizzle(
 
     const u32 MAX_BATCH_SLICES = (std::min)(z_count, image.info.size.depth);
 
-    if (!image.has_compute_unswizzle_buffer) {
-        // Allocate exactly what this batch needs
-        image.AllocateComputeUnswizzleBuffer(MAX_BATCH_SLICES);
-    }
+    // Allocate or grow to cover this batch's slice count
+    image.AllocateComputeUnswizzleBuffer(MAX_BATCH_SLICES);
 
     ASSERT(swizzles.size() == 1);
     const auto& sw = swizzles[0];
@@ -822,8 +797,6 @@ void BlockLinearUnswizzle3DPass::UnswizzleChunk(
     pc.blocks_dim[2] = z_count; // Only process the count
 
     compute_pass_descriptor_queue.Acquire(scheduler, 3);
-    compute_pass_descriptor_queue.AddBuffer(*image.runtime->swizzle_table_buffer, 0,
-                                           image.runtime->swizzle_table_size);
     compute_pass_descriptor_queue.AddBuffer(swizzled.buffer,
                                            sw.buffer_offset + swizzled.offset,
                                            image.guest_size_bytes - sw.buffer_offset);

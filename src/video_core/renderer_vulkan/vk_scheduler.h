@@ -251,6 +251,8 @@ private:
         bool needs_state_enable_refresh = false;
     };
 
+    void WorkerThread(std::stop_token stop_token);
+
     void AllocateWorkerCommandBuffer();
 
     u64 SubmitExecution(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore);
@@ -296,8 +298,6 @@ private:
     double last_target_fps{};
     u64 max_frame_count{};
     u64 frame_counter{};
-
-    u64 last_submitted_tick = 0;
 };
 
 } // namespace Vulkan

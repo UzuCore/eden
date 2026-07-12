@@ -84,7 +84,7 @@ vk::Buffer CreateBuffer(const Device& device, const MemoryAllocator& memory_allo
 } // Anonymous namespace
 
 Buffer::Buffer(BufferCacheRuntime& runtime, VideoCommon::NullBufferParams null_params)
-    : VideoCommon::BufferBase(null_params), tracker{4096} {
+    : VideoCommon::BufferBase(null_params), scheduler{&runtime.scheduler}, tracker{4096} {
     if (runtime.device.HasNullDescriptor()) {
         return;
     }
@@ -95,10 +95,16 @@ Buffer::Buffer(BufferCacheRuntime& runtime, VideoCommon::NullBufferParams null_p
 
 Buffer::Buffer(BufferCacheRuntime& runtime, DAddr cpu_addr_, u64 size_bytes_)
     : VideoCommon::BufferBase(cpu_addr_, size_bytes_), device{&runtime.device},
+      scheduler{&runtime.scheduler},
       buffer{CreateBuffer(*device, runtime.memory_allocator, SizeBytes())}, tracker{SizeBytes()} {
     if (runtime.device.HasDebuggingToolAttached()) {
         buffer.SetObjectNameEXT(fmt::format("Buffer 0x{:x}", CpuAddr()).c_str());
     }
+}
+
+void Buffer::MarkUsage(u64 offset, u64 size) noexcept {
+    tracker.Track(offset, size);
+    last_usage_tick = scheduler->CurrentTick();
 }
 
 VkBufferView Buffer::View(u32 offset, u32 size, VideoCore::Surface::PixelFormat format) {
@@ -384,8 +390,22 @@ u32 BufferCacheRuntime::GetStorageBufferAlignment() const {
 
 void BufferCacheRuntime::TickFrame(Common::SlotVector<Buffer>& slot_buffers) noexcept {
     for (auto it = slot_buffers.begin(); it != slot_buffers.end(); it++) {
-        it->ResetUsageTracking();
+        if (scheduler.IsFree(it->LastUsageTick())) {
+            it->ResetUsageTracking();
+        }
     }
+}
+
+u64 BufferCacheRuntime::CurrentTick() {
+    return scheduler.GetMasterSemaphore().CurrentTick();
+}
+
+u64 BufferCacheRuntime::KnownGpuTick() {
+    return scheduler.GetMasterSemaphore().KnownGpuTick();
+}
+
+void BufferCacheRuntime::Wait(u64 buffer_tick) {
+    scheduler.Wait(buffer_tick);
 }
 
 void BufferCacheRuntime::Finish() {

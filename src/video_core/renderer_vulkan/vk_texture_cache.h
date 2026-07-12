@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright 2025 Eden Emulator Project
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
@@ -130,9 +130,6 @@ public:
     std::optional<ASTCDecoderPass> astc_decoder_pass;
 
     std::optional<BlockLinearUnswizzle3DPass> bl3d_unswizzle_pass;
-    vk::Buffer swizzle_table_buffer;
-    VkDeviceSize swizzle_table_size = 0;
-
     std::optional<MSAACopyPass> msaa_copy_pass;
     const Settings::ResolutionScalingInfo& resolution;
     std::array<std::vector<VkFormat>, VideoCore::Surface::MaxPixelFormat> view_formats;
@@ -359,6 +356,10 @@ public:
         return samples;
     }
 
+    [[nodiscard]] bool SupportsDepthComparison() const noexcept {
+        return supports_depth_comparison;
+    }
+
     [[nodiscard]] GPUVAddr GpuAddr() const noexcept {
         return gpu_addr;
     }
@@ -373,13 +374,15 @@ private:
         std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> unsigneds;
     };
 
-    [[nodiscard]] vk::ImageView MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask);
+    [[nodiscard]] vk::ImageView MakeView(VkFormat vk_format, VkImageAspectFlags aspect_mask,
+                                         std::optional<Shader::TextureType> texture_type = std::nullopt);
 
     const Device* device = nullptr;
     const SlotVector<Image>* slot_images = nullptr;
 
     std::array<vk::ImageView, Shader::NUM_TEXTURE_TYPES> image_views;
     std::optional<StorageViews> storage_views;
+    vk::ImageView typeless_storage_view;
     vk::ImageView depth_view;
     vk::ImageView stencil_view;
     vk::ImageView color_view;
@@ -388,6 +391,9 @@ private:
     VkImageView render_target = VK_NULL_HANDLE;
     VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
     u32 buffer_size = 0;
+
+    bool uses_widened_astc_format = false;
+    bool supports_depth_comparison = false;
 };
 
 class ImageAlloc : public VideoCommon::ImageAllocBase {};
@@ -408,9 +414,27 @@ public:
         return static_cast<bool>(sampler_default_anisotropy);
     }
 
+    [[nodiscard]] VkSampler HandleWithNearestFilter() const noexcept {
+        return *sampler_nearest;
+    }
+
+    [[nodiscard]] bool HasLinearFiltering() const noexcept {
+        return static_cast<bool>(sampler_nearest);
+    }
+
+    [[nodiscard]] VkSampler HandleWithoutDepthComparison() const noexcept {
+        return *sampler_noncompare;
+    }
+
+    [[nodiscard]] bool HasDepthComparison() const noexcept {
+        return static_cast<bool>(sampler_noncompare);
+    }
+
 private:
     vk::Sampler sampler;
     vk::Sampler sampler_default_anisotropy;
+    vk::Sampler sampler_nearest;
+    vk::Sampler sampler_noncompare;
 };
 
 struct TextureCacheParams {

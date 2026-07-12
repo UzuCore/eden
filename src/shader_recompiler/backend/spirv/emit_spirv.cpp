@@ -403,6 +403,9 @@ void SetupCapabilities(const Profile& profile, const Info& info, EmitContext& ct
     if (info.uses_sampled_1d) {
         ctx.AddCapability(spv::Capability::Sampled1D);
     }
+    if (info.uses_image_1d) {
+        ctx.AddCapability(spv::Capability::Image1D);
+    }
     if (info.uses_sparse_residency) {
         ctx.AddCapability(spv::Capability::SparseResidency);
     }
@@ -432,7 +435,7 @@ void SetupCapabilities(const Profile& profile, const Info& info, EmitContext& ct
     }
     if ((info.uses_subgroup_vote || info.uses_subgroup_invocation_id ||
          info.uses_subgroup_shuffles) &&
-        profile.support_vote) {
+        profile.support_vote && profile.SupportsSubgroupStage(ctx.stage)) {
         ctx.AddCapability(spv::Capability::GroupNonUniformBallot);
         ctx.AddCapability(spv::Capability::GroupNonUniformShuffle);
         if (!profile.warp_size_potentially_larger_than_guest) {

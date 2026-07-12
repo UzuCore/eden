@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: 2018 Citra Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <array>
+#include <numbers>
 #include "common/logging.h"
 #include "common/math_util.h"
 #include "common/param_package.h"
@@ -146,9 +148,9 @@ public:
             break;
         }
         case SDL_SENSOR_GYRO: {
-            motion.gyro_x = event.data[0] / (Common::PI * 2);
-            motion.gyro_y = -event.data[2] / (Common::PI * 2);
-            motion.gyro_z = event.data[1] / (Common::PI * 2);
+            motion.gyro_x = event.data[0] / (f32(std::numbers::pi_v<float>) * 2);
+            motion.gyro_y = -event.data[2] / (f32(std::numbers::pi_v<float>) * 2);
+            motion.gyro_z = event.data[1] / (f32(std::numbers::pi_v<float>) * 2);
             break;
         }
         }
@@ -948,34 +950,39 @@ ButtonMapping SDLDriver::GetButtonMappingForDevice(const Common::ParamPackage& p
     }
     const auto joystick = GetSDLJoystickByGUID(params.Get("guid", ""), params.Get("port", 0));
 
-    auto* controller = joystick->GetSDLGameController();
-    if (controller == nullptr) {
-        return {};
-    }
-
     // This list is missing ZL/ZR since those are not considered buttons in SDL GameController.
     // We will add those afterwards
-    ButtonBindings switch_to_sdl_button;
-
-    switch_to_sdl_button = GetDefaultButtonBinding(joystick);
-
+    ButtonBindings switch_to_sdl_button = GetDefaultButtonBinding(joystick);
     // Add the missing bindings for ZL/ZR
     static constexpr ZButtonBindings switch_to_sdl_axis{{
         {Settings::NativeButton::ZL, SDL_GAMEPAD_AXIS_LEFT_TRIGGER},
         {Settings::NativeButton::ZR, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER},
     }};
-
-    // Parameters contain two joysticks return dual
-    if (params.Has("guid2")) {
-        const auto joystick2 = GetSDLJoystickByGUID(params.Get("guid2", ""), params.Get("port", 0));
-
-        if (joystick2->GetSDLGameController() != nullptr) {
-            return GetDualControllerMapping(joystick, joystick2, switch_to_sdl_button,
-                                            switch_to_sdl_axis);
+    if (auto* controller = joystick->GetSDLGameController(); controller) {
+        // Parameters contain two joysticks return dual
+        if (params.Has("guid2")) {
+            const auto joystick2 = GetSDLJoystickByGUID(params.Get("guid2", ""), params.Get("port", 0));
+            if (joystick2->GetSDLGameController())
+                return GetDualControllerMapping(joystick, joystick2, switch_to_sdl_button, switch_to_sdl_axis);
         }
+        return GetSingleControllerMapping(joystick, switch_to_sdl_button, switch_to_sdl_axis);
     }
-
-    return GetSingleControllerMapping(joystick, switch_to_sdl_button, switch_to_sdl_axis);
+    // Default mappings for when the controller doesn't have an associated gamepad
+    // This fixes issues where SDL uses a backend which doesn't support gamepad remappings
+    ButtonMapping mapping;
+    for (const auto& pair : switch_to_sdl_button) {
+        SDL_GamepadBinding binding{};
+        binding.input_type = SDL_GAMEPAD_BINDTYPE_BUTTON;
+        binding.input.button = pair.second;
+        mapping.insert_or_assign(pair.first, BuildParamPackageForBinding(joystick->GetPort(), joystick->GetGUID(), binding));
+    }
+    for (const auto& pair : switch_to_sdl_axis) {
+        SDL_GamepadBinding binding{};
+        binding.input_type = SDL_GAMEPAD_BINDTYPE_AXIS;
+        binding.input.axis.axis = pair.second;
+        mapping.insert_or_assign(pair.first, BuildParamPackageForBinding(joystick->GetPort(), joystick->GetGUID(), binding));
+    }
+    return mapping;
 }
 
 ButtonBindings SDLDriver::GetDefaultButtonBinding(

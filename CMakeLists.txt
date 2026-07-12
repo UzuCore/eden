@@ -270,7 +270,7 @@ if (ANDROID AND YUZU_DOWNLOAD_ANDROID_VVL)
     set(abi ${CMAKE_ANDROID_ARCH_ABI})
 
     set(vvl_lib_path "${CMAKE_CURRENT_SOURCE_DIR}/src/android/app/src/main/jniLibs/${abi}/")
-    file(COPY "${VVL_SOURCE_DIR}/${abi}/libVkLayer_khronos_validation.so"
+    file(COPY "${vulkan-validation-layers_SOURCE_DIR}/${abi}/libVkLayer_khronos_validation.so"
         DESTINATION "${vvl_lib_path}")
 endif()
 
@@ -279,25 +279,6 @@ if(EXISTS ${PROJECT_SOURCE_DIR}/hooks/pre-commit AND NOT EXISTS ${PROJECT_SOURCE
         message(STATUS "Copying pre-commit hook")
         file(COPY hooks/pre-commit DESTINATION ${PROJECT_SOURCE_DIR}/.git/hooks)
     endif()
-endif()
-
-set(compat_base dist/compatibility_list/compatibility_list)
-set(compat_qrc ${compat_base}.qrc)
-set(compat_json ${compat_base}.json)
-
-configure_file(${PROJECT_SOURCE_DIR}/${compat_qrc}
-    ${PROJECT_BINARY_DIR}/${compat_qrc}
-    COPYONLY)
-
-if (EXISTS ${PROJECT_SOURCE_DIR}/${compat_json})
-    configure_file("${PROJECT_SOURCE_DIR}/${compat_json}"
-        "${PROJECT_BINARY_DIR}/${compat_json}"
-        COPYONLY)
-endif()
-
-# TODO: Compat list download
-if (NOT EXISTS ${PROJECT_BINARY_DIR}/${compat_json})
-    file(WRITE ${PROJECT_BINARY_DIR}/${compat_json} "")
 endif()
 
 if (ARCHITECTURE_arm64 AND (ANDROID OR PLATFORM_LINUX))
