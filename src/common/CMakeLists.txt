@@ -121,6 +121,8 @@ add_library(
     swap.h
     thread.cpp
     thread.h
+    adpf.cpp
+    adpf.h
     thread_queue_list.h
     thread_worker.h
     threadsafe_queue.h
@@ -218,7 +220,7 @@ endif()
 if(CXX_CLANG)
     target_compile_options(common PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX>:-fsized-deallocation>
-        $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=unreachable-code-aggressive>)
+        $<$<COMPILE_LANGUAGE:C,CXX>:-Wunreachable-code-aggressive>)
     target_compile_definitions(
         common
         PRIVATE

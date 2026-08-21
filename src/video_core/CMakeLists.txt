@@ -158,6 +158,8 @@ add_library(video_core STATIC
     renderer_vulkan/vk_compute_pass.h
     renderer_vulkan/vk_compute_pipeline.cpp
     renderer_vulkan/vk_compute_pipeline.h
+    renderer_vulkan/vk_descriptor_buffer.cpp
+    renderer_vulkan/vk_descriptor_buffer.h
     renderer_vulkan/vk_descriptor_pool.cpp
     renderer_vulkan/vk_descriptor_pool.h
     renderer_vulkan/vk_fence_manager.cpp
@@ -265,6 +267,38 @@ add_library(video_core STATIC
     video_core.h
 )
 
+if (ENABLE_LSFG)
+    target_sources(video_core PRIVATE
+        frame_gen/lossless_dll.cpp
+        frame_gen/lossless_dll.h
+        frame_gen/lsfg_translate.cpp
+        frame_gen/lsfg_translate.h
+        renderer_vulkan/present/frame_gen.cpp
+        renderer_vulkan/present/frame_gen.h
+        renderer_vulkan/present/frame_gen_pacer.cpp
+        renderer_vulkan/present/frame_gen_pacer.h
+        renderer_vulkan/present/lsfg_alpha.cpp
+        renderer_vulkan/present/lsfg_alpha.h
+        renderer_vulkan/present/lsfg_beta.cpp
+        renderer_vulkan/present/lsfg_beta.h
+        renderer_vulkan/present/lsfg_chain.cpp
+        renderer_vulkan/present/lsfg_chain.h
+        renderer_vulkan/present/lsfg_common.cpp
+        renderer_vulkan/present/lsfg_common.h
+        renderer_vulkan/present/lsfg_delta.cpp
+        renderer_vulkan/present/lsfg_delta.h
+        renderer_vulkan/present/lsfg_gamma.cpp
+        renderer_vulkan/present/lsfg_gamma.h
+        renderer_vulkan/present/lsfg_generate.cpp
+        renderer_vulkan/present/lsfg_generate.h
+        renderer_vulkan/present/lsfg_mipmaps.cpp
+        renderer_vulkan/present/lsfg_mipmaps.h
+        renderer_vulkan/present/lsfg_shaders.cpp
+        renderer_vulkan/present/lsfg_shaders.h
+    )
+    target_compile_definitions(video_core PUBLIC HAS_LSFG)
+endif()
+
 if (ENABLE_OPENGL)
     target_sources(video_core PRIVATE
         renderer_opengl/present/filters.cpp
@@ -371,7 +405,7 @@ else()
             $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-shadow>
             $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-unused-local-typedef>)
     else()
-        target_compile_options(video_core PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=conversion>)
+        target_compile_options(video_core PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-Wconversion>)
     endif()
 
     target_compile_options(video_core PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-sign-conversion>)

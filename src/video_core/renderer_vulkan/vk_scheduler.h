@@ -80,6 +80,9 @@ public:
     /// Update the rescaling state. Returns true if the state has to be updated.
     bool UpdateRescaling(bool is_rescaling);
 
+    /// Returns true when the descriptor buffer chunk has to be bound into the command buffer.
+    bool UpdateDescriptorBufferChunk(u32 descriptor_chunk);
+
     /// Invalidates current command buffer state except for render passes
     void InvalidateState();
 
@@ -143,9 +146,10 @@ public:
             frame_counter++;
             auto target_time = start_time + frame_interval * frame_counter;
             if (target_time >= now) {
+                constexpr auto spin_tail = std::chrono::milliseconds(1);
                 auto sleep_time = target_time - now;
-                if (sleep_time > std::chrono::milliseconds(15)) {
-                    std::this_thread::sleep_for(sleep_time - std::chrono::milliseconds(1));
+                if (sleep_time > spin_tail * 2) {
+                    std::this_thread::sleep_for(sleep_time - spin_tail);
                 }
                 while (std::chrono::steady_clock::now() < target_time) {
                     std::this_thread::yield();
@@ -255,6 +259,8 @@ private:
         bool is_rescaling = false;
         bool rescaling_defined = false;
         bool needs_state_enable_refresh = false;
+        u32 descriptor_buffer_chunk = 0;
+        bool descriptor_buffer_bound = false;
     };
 
     struct DeferredClear {
