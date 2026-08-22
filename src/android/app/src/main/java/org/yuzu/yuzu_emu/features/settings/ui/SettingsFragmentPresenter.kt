@@ -99,7 +99,12 @@ class SettingsFragmentPresenter(
 
             add(BooleanSetting.RENDERER_FRAME_GEN.key)
             add(IntSetting.RENDERER_FRAME_GEN_TARGET_RATE.key)
-            add(IntSetting.RENDERER_FRAME_GEN_MULTIPLIER.key)
+            if (IntSetting.RENDERER_FRAME_GEN_TARGET_RATE.getInt(
+                    getNeedsGlobalForKey(IntSetting.RENDERER_FRAME_GEN_TARGET_RATE.key)
+                ) == 0
+            ) {
+                add(IntSetting.RENDERER_FRAME_GEN_MULTIPLIER.key)
+            }
             add(IntSetting.RENDERER_FRAME_GEN_QUEUE_TARGET.key)
             add(BooleanSetting.RENDERER_FRAME_GEN_FLOW_SCALE_AUTO.key)
             if (!BooleanSetting.RENDERER_FRAME_GEN_FLOW_SCALE_AUTO.getBoolean(
@@ -307,8 +312,6 @@ class SettingsFragmentPresenter(
     // TODO(crueter): sub-submenus?
     private fun addGraphicsSettings(sl: ArrayList<SettingsItem>) {
         sl.apply {
-            // add(IntSetting.RENDERER_NVDEC_EMULATION.key)
-
             add(IntSetting.RENDERER_RESOLUTION.key)
             add(IntSetting.RENDERER_VSYNC.key)
             add(IntSetting.RENDERER_SCALING_FILTER.key)
@@ -325,6 +328,7 @@ class SettingsFragmentPresenter(
             add(IntSetting.MAX_ANISOTROPY.key)
             add(IntSetting.RENDERER_VRAM_USAGE_MODE.key)
             add(IntSetting.RENDERER_ASTC_DECODE_METHOD.key)
+            add(IntSetting.RENDERER_NVDEC_EMULATION.key)
 
             add(BooleanSetting.SYNC_MEMORY_OPERATIONS.key)
             add(BooleanSetting.RENDERER_USE_DISK_SHADER_CACHE.key)
