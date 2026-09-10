@@ -10,7 +10,8 @@
 #include <functional>
 #include <memory>
 #include <thread>
-#include <ankerl/unordered_dense.h>
+#include "common/container/unordered_map.h"
+#include "common/container/unordered_set.h"
 #include <utility>
 
 #include "common/assert.h"
@@ -349,9 +350,18 @@ struct KernelCore::Impl {
         object_name_global_data.emplace(kernel);
     }
 
-    void MakeApplicationProcess(KernelCore& kernel, KProcess* process) {
+    void SetApplicationProcess(KernelCore& kernel, KProcess* process) {
+        if (application_process == process)
+            return;
+
+        KProcess* const previous = application_process;
         application_process = process;
-        application_process->Open(kernel);
+
+        if (application_process != nullptr)
+            application_process->Open(kernel);
+
+        if (previous != nullptr)
+            previous->Close(kernel);
     }
 
     /// Sets the host thread ID for the caller.
@@ -783,8 +793,8 @@ struct KernelCore::Impl {
 
     std::optional<KObjectNameGlobalData> object_name_global_data;
 
-    ankerl::unordered_dense::set<KAutoObject*> registered_objects;
-    ankerl::unordered_dense::set<KAutoObject*> registered_in_use_objects;
+    ::Common::unordered_set<KAutoObject*> registered_objects;
+    ::Common::unordered_set<KAutoObject*> registered_in_use_objects;
 
     std::mutex server_lock;
     std::vector<std::unique_ptr<Service::ServerManager>> server_managers;
@@ -879,8 +889,8 @@ void KernelCore::RemoveProcess(KProcess* process) {
     }
 }
 
-void KernelCore::MakeApplicationProcess(KProcess* process) {
-    impl->MakeApplicationProcess(*this, process);
+void KernelCore::SetApplicationProcess(KProcess* process) {
+    impl->SetApplicationProcess(*this, process);
 }
 
 KProcess* KernelCore::ApplicationProcess() {
@@ -889,6 +899,14 @@ KProcess* KernelCore::ApplicationProcess() {
 
 const KProcess* KernelCore::ApplicationProcess() const {
     return impl->application_process;
+}
+
+KScopedAutoObject<KProcess> KernelCore::GetProcessByProcessId(u64 process_id) {
+    std::scoped_lock lk{impl->process_list_lock};
+    for (auto* const process : impl->process_list)
+        if (process != nullptr && process->GetProcessId() == process_id)
+            return {*this, process};
+    return {*this, nullptr};
 }
 
 std::list<KScopedAutoObject<KProcess>> KernelCore::GetProcessList() {

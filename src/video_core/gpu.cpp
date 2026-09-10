@@ -55,11 +55,11 @@ constexpr u64 GpuClockMultiplier(Settings::GpuClock clock) {
 
 struct GPU::Impl {
     explicit Impl(Core::System& system_, bool is_async_, bool use_nvdec_)
-        : system{system_}
+        : gpu_thread{system_}
+        , system{system_}
         , use_nvdec{use_nvdec_}
         , shader_notify()
         , is_async{is_async_}
-        , gpu_thread{system_}
     {}
 
     ~Impl() = default;
@@ -142,6 +142,12 @@ struct GPU::Impl {
     void WaitForSyncOperation(const u64 fence) {
         std::unique_lock lck{sync_request_mutex};
         sync_request_cv.wait(lck, [this, fence] { return CurrentSyncRequestFence() >= fence; });
+    }
+
+    void WaitForIdle() {
+        const u64 fence = RequestSyncOperation([] {});
+        gpu_thread.TickGPU(is_async);
+        WaitForSyncOperation(fence);
     }
 
     /// Tick pending requests within the GPU.
@@ -295,6 +301,10 @@ struct GPU::Impl {
         return out;
     }
 
+    // Destruction of thread must be done before all (non trivial)
+    // previous members has been destroyed
+    VideoCommon::GPUThread::ThreadManager gpu_thread;
+
     Core::System& system;
 
     std::unique_ptr<VideoCore::RendererBase> renderer;
@@ -323,11 +333,10 @@ struct GPU::Impl {
 
     const bool is_async;
 
-    VideoCommon::GPUThread::ThreadManager gpu_thread;
     std::unique_ptr<Core::Frontend::GraphicsContext> cpu_context;
 
     Tegra::Control::Scheduler scheduler;
-    ankerl::unordered_dense::map<s32, std::shared_ptr<Tegra::Control::ChannelState>> channels;
+    ::Common::unordered_map<s32, std::shared_ptr<Tegra::Control::ChannelState>> channels;
     Tegra::Control::ChannelState* current_channel;
     s32 bound_channel{-1};
 
@@ -482,6 +491,10 @@ void GPU::Start() {
 
 void GPU::NotifyShutdown() {
     impl->NotifyShutdown();
+}
+
+void GPU::WaitForIdle() {
+    impl->WaitForIdle();
 }
 
 void GPU::ObtainContext() {

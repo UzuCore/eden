@@ -184,6 +184,7 @@ void Load(VkDevice device, DeviceDispatch& dld) noexcept {
     X(vkCreatePipelineLayout);
     X(vkCreateQueryPool);
     X(vkCreateRenderPass);
+    X(vkCreateRenderPass2);
     X(vkCreateSampler);
     X(vkCreateSemaphore);
     X(vkCreateShaderModule);
@@ -228,6 +229,7 @@ void Load(VkDevice device, DeviceDispatch& dld) noexcept {
     X(vkGetPipelineExecutableStatisticsKHR);
     X(vkGetSemaphoreCounterValue);
     X(vkMapMemory);
+    X(vkQueueBindSparse);
     X(vkQueueSubmit);
     X(vkQueueSubmit2);
     X(vkResetFences);
@@ -269,6 +271,10 @@ void Load(VkDevice device, DeviceDispatch& dld) noexcept {
     }
     if (!dld.vkQueueSubmit2) {
         Proc(dld.vkQueueSubmit2, dld, "vkQueueSubmit2KHR", device);
+    }
+
+    if (!dld.vkCreateRenderPass2) {
+        Proc(dld.vkCreateRenderPass2, dld, "vkCreateRenderPass2KHR", device);
     }
 #undef X
 }
@@ -454,8 +460,20 @@ Instance Instance::Create(u32 version, Span<const char*> layers, Span<const char
 #else
     constexpr VkFlags ci_flags{};
 #endif
-    // DO NOT TOUCH, breaks RNDA3!!
-    // Don't know why, but gloom + yellow line glitch appears
+    // DO NOT TOUCH OR CHANGE THE ENGINE NAME/APPLICATION NAME, breaks RNDA3!!
+    // AMD drivers have fixes for Yuzu
+    // if remove => gloom + yellow line glitch appears
+#ifdef __ANDROID__
+    const VkApplicationInfo application_info{
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pNext = nullptr,
+        .pApplicationName = "PUBGMobile",
+        .applicationVersion = VK_MAKE_VERSION(1, 7, 0),
+        .pEngineName = "UnrealEngine",
+        .engineVersion = VK_MAKE_VERSION(4, 23, 0),
+        .apiVersion = VK_API_VERSION_1_3,
+    };
+#else
     const VkApplicationInfo application_info{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pNext = nullptr,
@@ -465,6 +483,7 @@ Instance Instance::Create(u32 version, Span<const char*> layers, Span<const char
         .engineVersion = VK_MAKE_VERSION(1, 3, 0),
         .apiVersion = VK_API_VERSION_1_3,
     };
+#endif
     const VkInstanceCreateInfo ci{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = nullptr,
@@ -722,6 +741,12 @@ DescriptorPool Device::CreateDescriptorPool(const VkDescriptorPoolCreateInfo& ci
 RenderPass Device::CreateRenderPass(const VkRenderPassCreateInfo& ci) const {
     VkRenderPass object;
     Check(dld->vkCreateRenderPass(handle, &ci, nullptr, &object));
+    return RenderPass(object, handle, *dld);
+}
+
+RenderPass Device::CreateRenderPass2(const VkRenderPassCreateInfo2& ci) const {
+    VkRenderPass object;
+    Check(dld->vkCreateRenderPass2(handle, &ci, nullptr, &object));
     return RenderPass(object, handle, *dld);
 }
 

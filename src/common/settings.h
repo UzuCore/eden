@@ -388,6 +388,30 @@ struct Values {
                                                   true,
                                                   true};
 
+    SwitchableSetting<std::string> post_shader_chain{linkage,
+                                                     std::string(),
+                                                     "post_shader_chain",
+                                                     Category::Renderer,
+                                                     Specialization::Default,
+                                                     true,
+                                                     true};
+
+    SwitchableSetting<std::string> post_shader_preset{linkage,
+                                                      std::string(),
+                                                      "post_shader_preset",
+                                                      Category::Renderer,
+                                                      Specialization::Default,
+                                                      true,
+                                                      true};
+
+    SwitchableSetting<bool> post_shader_enabled{linkage,
+                                                true,
+                                                "post_shader_enabled",
+                                                Category::Renderer,
+                                                Specialization::Default,
+                                                true,
+                                                true};
+
     SwitchableSetting<bool> frame_gen{linkage, false, "frame_gen", Category::Renderer,
                                       Specialization::Default, true, false};
 
@@ -858,7 +882,7 @@ struct Values {
     SwitchableSetting<std::string> program_args{linkage,
                                                 std::string(),
                                                 "program_args",
-                                                Category::System,
+                                                Category::Debugging,
                                                 Specialization::Default,
                                                 true,    // save_ - persist in config file
                                                 false};  // runtime_modifiable_ - startup-only
@@ -947,7 +971,7 @@ constexpr u32 MAX_FRAME_GEN_MULTIPLIER = 4;
 
 [[nodiscard]] size_t FrameGenMaxGenerations();
 
-bool getDebugKnobAt(u8 i);
+bool GetDebugKnobAt(u8 i);
 
 void UpdateGPUAccuracy();
 bool IsGPULevelHigh();

@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <iostream>
 #include <sstream>
-#include <ankerl/unordered_dense.h>
+#include "common/container/unordered_map.h"
 
 #include "common/assert.h"
 #include "common/fs/fs.h"
@@ -160,6 +160,8 @@ public:
         GenerateEdenPath(EdenPath::LosslessDir, eden_path / LOSSLESS_DIR);
         GenerateEdenPath(EdenPath::NANDDir, eden_path / NAND_DIR);
         GenerateEdenPath(EdenPath::PlayTimeDir, eden_path / PLAY_TIME_DIR);
+        GenerateEdenPath(EdenPath::PostPresetDir, eden_path / POST_PRESET_DIR);
+        GenerateEdenPath(EdenPath::PostShaderDir, eden_path / POST_SHADER_DIR);
         GenerateEdenPath(EdenPath::SaveDir, eden_path / NAND_DIR);
         GenerateEdenPath(EdenPath::ScreenshotsDir, eden_path / SCREENSHOTS_DIR);
         GenerateEdenPath(EdenPath::SDMCDir, eden_path / SDMC_DIR);
@@ -196,8 +198,8 @@ private:
         SetLegacyPathImpl(legacy_path, new_path);
     }
 
-    ankerl::unordered_dense::map<EdenPath, fs::path> eden_paths;
-    ankerl::unordered_dense::map<EmuPath, fs::path> legacy_paths;
+    ::Common::unordered_map<EdenPath, fs::path> eden_paths;
+    ::Common::unordered_map<EmuPath, fs::path> legacy_paths;
 };
 
 bool ValidatePath(const fs::path& path) {

@@ -6,13 +6,13 @@
 
 #include <mutex>
 #include <utility>
+#include <type_traits>
+
 #include <boost/asio.hpp>
 #include <boost/version.hpp>
-
 #if BOOST_VERSION > 108400 && (!defined(_WINDOWS) && !defined(__ANDROID__)) || defined(YUZU_BOOST_v1)
 #define USE_BOOST_v1
 #endif
-
 #ifdef USE_BOOST_v1
 #include <boost/process/v1/async_pipe.hpp>
 #else
@@ -358,7 +358,7 @@ private:
 
         ConnectionState(boost::asio::ip::tcp::socket&& client_socket_, async_pipe signal_pipe_, Kernel::KernelCore& kernel)
             : client_socket{std::move(client_socket_)}
-            , signal_pipe{signal_pipe_}
+            , signal_pipe{std::move(signal_pipe_)}
             , active_thread{kernel, nullptr}
         {}
 

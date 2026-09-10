@@ -56,6 +56,9 @@ class QSlider;
 class QHBoxLayout;
 class WaitTreeWidget;
 class PerformanceOverlay;
+#ifdef HAS_RESHADE
+class ConfigurePostProcessing;
+#endif
 enum class GameListOpenTarget;
 enum class DumpRomFSTarget;
 class GameListPlaceholder;
@@ -336,8 +339,7 @@ private slots:
     void OnPrepareForSleep(bool prepare_sleep);
     void OnMenuReportCompatibility();
     void OnOpenModsPage();
-    void OnOpenQuickstartGuide();
-    void OnOpenFAQ();
+    void OnOpenUserHandbook();
 
     /// Called whenever a user selects a game in the game list widget.
     void OnGameListLoadFile(QString game_path, u64 program_id);
@@ -392,6 +394,9 @@ private slots:
     void OnToggleFilterBar();
     void OnToggleStatusBar();
     void OnTogglePerfOverlay();
+#ifdef HAS_RESHADE
+    void OnPostProcessingShaders();
+#endif
     void OnGameListRefresh();
     void InitializeHotkeys();
     void ToggleFullscreen();
@@ -438,6 +443,7 @@ private:
     ContentManager::InstallResult InstallNCA(const QString& filename);
     void UpdateWindowTitle(std::string_view title_name = {}, std::string_view title_version = {},
                            std::string_view gpu_vendor = {});
+    void OnApplicationChanged(u64 program_id);
     void UpdateDockedButton();
     void UpdateAPIText();
     void UpdateFilterText();
@@ -495,6 +501,9 @@ private:
     QTimer shutdown_timer;
     OverlayDialog* shutdown_dialog{};
     PerformanceOverlay* perf_overlay = nullptr;
+#ifdef HAS_RESHADE
+    ConfigurePostProcessing* post_processing_dialog = nullptr;
+#endif
 
     GameListPlaceholder* game_list_placeholder = nullptr;
 

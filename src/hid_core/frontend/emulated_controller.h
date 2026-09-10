@@ -14,7 +14,7 @@
 #include <vector>
 #include <atomic>
 
-#include <ankerl/unordered_dense.h>
+#include "common/container/unordered_map.h"
 
 #include "common/common_types.h"
 #include "common/input.h"
@@ -107,11 +107,11 @@ struct RingSensorForce {
 using NfcState = Common::Input::NfcStatus;
 
 struct ControllerMotion {
-    Common::Vec3f accel{};
-    Common::Vec3f gyro{};
-    Common::Vec3f rotation{};
-    Common::Vec3f euler{};
-    std::array<Common::Vec3f, 3> orientation{};
+    Common::Vec<f32, 3> accel{};
+    Common::Vec<f32, 3> gyro{};
+    Common::Vec<f32, 3> rotation{};
+    Common::Vec<f32, 3> euler{};
+    std::array<Common::Vec<f32, 3>, 3> orientation{};
     bool is_at_rest{};
 };
 
@@ -636,7 +636,7 @@ private:
     ControllerMotionDevices virtual_motion_devices;
 
     mutable std::mutex callback_mutex;
-    ankerl::unordered_dense::map<int, ControllerUpdateCallback> callback_list;
+    ::Common::unordered_map<int, ControllerUpdateCallback> callback_list;
     int last_callback_key = 0;
 
     // Stores the current status of all controller input

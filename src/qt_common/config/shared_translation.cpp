@@ -150,6 +150,7 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
     INSERT(Settings, anti_aliasing, tr("Anti-Aliasing Method:"),
            tr("The anti-aliasing method to use.\nSMAA offers the best quality.\nFXAA "
               "can produce a more stable picture in lower resolutions."));
+    INSERT(Settings, post_shader_chain, QString(), QString());
     INSERT(Settings, fullscreen_mode, tr("Fullscreen Mode:"),
            tr("The method used to render the window in fullscreen.\nBorderless offers the best "
               "compatibility with the on-screen keyboard that some games request for "
@@ -522,9 +523,6 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent) {
                               PAIR(AnisotropyMode, X4, tr("4x")),
                               PAIR(AnisotropyMode, X8, tr("8x")),
                               PAIR(AnisotropyMode, X16, tr("16x")),
-                              PAIR(AnisotropyMode, X32, tr("32x")),
-                              PAIR(AnisotropyMode, X64, tr("64x")),
-                              PAIR(AnisotropyMode, None, tr("None")),
                           }});
     translations->insert(
         {Settings::EnumMetadata<Settings::Language>::Index(),

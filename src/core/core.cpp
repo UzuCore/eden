@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 
 #include "game_settings.h"
@@ -248,12 +249,30 @@ struct System::Impl {
         }
     }
 
-    void SetNVDECActive(bool is_nvdec_active) {
-        nvdec_active = is_nvdec_active;
+    void NotifyNVDECChannelOpen(u64 process_id) {
+        std::scoped_lock lock{nvdec_active_mutex};
+        ++nvdec_active_channels[process_id];
+    }
+
+    void NotifyNVDECChannelClose(u64 process_id) {
+        std::scoped_lock lock{nvdec_active_mutex};
+        const auto it = nvdec_active_channels.find(process_id);
+        if (it == nvdec_active_channels.end()) {
+            return;
+        }
+        if (--it->second == 0) {
+            nvdec_active_channels.erase(it);
+        }
     }
 
     bool GetNVDECActive() {
-        return nvdec_active;
+        std::scoped_lock lock{nvdec_active_mutex};
+        return !nvdec_active_channels.empty();
+    }
+
+    bool IsNVDECActiveForProcess(u64 process_id) {
+        std::scoped_lock lock{nvdec_active_mutex};
+        return nvdec_active_channels.contains(process_id);
     }
 
     void InitializeDebugger(System& system, u16 port) {
@@ -295,6 +314,10 @@ struct System::Impl {
     SystemResultStatus Load(System& system, Frontend::EmuWindow& emu_window, const std::string& filepath, Service::AM::FrontendAppletParameters& params) {
         InitializeKernel(system);
 
+        if (params.applet_type == Service::AM::AppletType::Application) {
+            current_application_filepath = filepath;
+        }
+
         const auto file = GetGameFileFromPath(virtual_filesystem, filepath);
 
         // Create the application process
@@ -330,7 +353,7 @@ struct System::Impl {
         LaunchTimestampCache::SaveLaunchTimestamp(params.program_id);
 
         // Make the process created be the application
-        kernel.MakeApplicationProcess(process->GetHandle());
+        kernel.SetApplicationProcess(process->GetHandle());
 
         // Set up the rest of the system.
         SystemResultStatus init_result{SetupForApplicationProcess(system, emu_window)};
@@ -467,6 +490,7 @@ struct System::Impl {
     Core::SpeedLimiter speed_limiter;
     ExecuteProgramCallback execute_program_callback;
     ExitCallback exit_callback;
+    ApplicationChangedCallback application_changed_callback;
 
     std::optional<Service::Services> services;
     std::optional<Core::Debugger> debugger;
@@ -488,6 +512,8 @@ struct System::Impl {
     std::array<u64, Core::Hardware::NUM_CPU_CORES> dynarmic_ticks{};
     std::array<u8, 0x20> build_id{};
 
+    std::string current_application_filepath;
+
     /// Service manager
     std::shared_ptr<Service::SM::ServiceManager> service_manager;
     /// ContentProviderUnion instance
@@ -498,6 +524,8 @@ struct System::Impl {
 
     mutable std::mutex suspend_guard;
     std::mutex general_channel_mutex;
+    std::mutex nvdec_active_mutex;
+    std::unordered_map<u64, u32> nvdec_active_channels;
     std::atomic_bool is_paused{};
     std::atomic_bool is_shutting_down{};
     std::atomic_bool is_powered_on{};
@@ -505,7 +533,6 @@ struct System::Impl {
     bool extended_memory_layout : 1 = false;
     bool exit_locked : 1 = false;
     bool exit_requested : 1 = false;
-    bool nvdec_active : 1 = false;
 
     void EnsureGeneralChannelInitialized(System& system) {
         if (!general_channel_event) {
@@ -569,12 +596,20 @@ void System::UnstallApplication() {
     impl->UnstallApplication();
 }
 
-void System::SetNVDECActive(bool is_nvdec_active) {
-    impl->SetNVDECActive(is_nvdec_active);
+void System::NotifyNVDECChannelOpen(u64 process_id) {
+    impl->NotifyNVDECChannelOpen(process_id);
+}
+
+void System::NotifyNVDECChannelClose(u64 process_id) {
+    impl->NotifyNVDECChannelClose(process_id);
 }
 
 bool System::GetNVDECActive() {
     return impl->GetNVDECActive();
+}
+
+bool System::IsNVDECActiveForProcess(u64 process_id) {
+    return impl->IsNVDECActiveForProcess(process_id);
 }
 
 void System::InitializeDebugger() {
@@ -727,7 +762,25 @@ const Core::SpeedLimiter& System::SpeedLimiter() const {
 }
 
 u64 System::GetApplicationProcessProgramID() const {
-    return impl->kernel.ApplicationProcess()->GetProgramId();
+    const auto* const process = impl->kernel.ApplicationProcess();
+    return process != nullptr ? process->GetProgramId() : 0;
+}
+
+u64 System::GetProgramIdForProcessId(u64 process_id) const {
+    auto process = impl->kernel.GetProcessByProcessId(process_id);
+    return process.IsNull() ? 0 : process->GetProgramId();
+}
+
+u64 System::ResolveCallerProgramId(u64 process_id) const {
+    if (const auto program_id = this->GetProgramIdForProcessId(process_id); program_id != 0) {
+        return program_id;
+    }
+
+    const auto fallback = this->GetApplicationProcessProgramID();
+    LOG_WARNING(Core,
+                "Could not resolve caller process_id={}, falling back to application {:016X}",
+                process_id, fallback);
+    return fallback;
 }
 
 Loader::ResultStatus System::GetGameName(std::string& out) const {
@@ -910,6 +963,10 @@ void System::ExecuteProgram(std::size_t program_index) {
     }
 }
 
+const std::string& System::GetCurrentApplicationFilePath() const {
+    return impl->current_application_filepath;
+}
+
 /// @brief Gets a reference to the user channel stack.
 /// It is used to transfer data between programs.
 std::vector<std::vector<u8>>& System::GetUserChannel() {
@@ -958,6 +1015,18 @@ void System::Exit() {
         impl->exit_callback();
     } else {
         LOG_CRITICAL(Core, "exit_callback must be initialized by the frontend");
+    }
+}
+
+void System::RegisterApplicationChangedCallback(ApplicationChangedCallback&& callback) {
+    impl->application_changed_callback = std::move(callback);
+}
+
+void System::NotifyApplicationChanged(u64 program_id) {
+    //LOG_DEBUG(Core, "Running application changed to {:016X}", program_id);
+
+    if (impl->application_changed_callback) {
+        impl->application_changed_callback(program_id);
     }
 }
 

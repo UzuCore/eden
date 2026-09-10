@@ -3,6 +3,7 @@
 
 cmake_minimum_required(VERSION 3.31)
 
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "macOS deployment target")
 project(yuzu)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
@@ -83,6 +84,8 @@ option(ENABLE_WERROR "Enable -Werror diagnostics" ON)
 
 # Lossless Scaling frame generation. Only Android.
 cmake_dependent_option(ENABLE_LSFG "Enable Lossless Scaling frame generation" ON "ANDROID" OFF)
+
+option(ENABLE_RESHADE "Enable ReShade FX post-processing effects" ON)
 
 # non-linux bundled qt are static
 if (YUZU_USE_BUNDLED_QT AND (APPLE OR NOT UNIX))
@@ -214,14 +217,14 @@ if(MSVC)
 endif()
 
 # TODO(crueter): Cleanup, each dep that has a bundled option should allow to choose between bundled, external, system
-cmake_dependent_option(YUZU_USE_BUNDLED_SDL3 "Download bundled SDL3 build" "${MSVC}" "NOT ANDROID" OFF)
-
 option(ENABLE_CUBEB "Enables the cubeb audio backend" ON)
 
 set(EXT_DEFAULT OFF)
 if (MSVC OR ANDROID)
     set(EXT_DEFAULT ON)
 endif()
+
+option(YUZU_USE_BUNDLED_SDL3 "Download bundled SDL3 build" ${EXT_DEFAULT})
 
 # ffmpeg
 option(YUZU_USE_BUNDLED_FFMPEG "Download bundled FFmpeg" ${EXT_DEFAULT})
@@ -238,7 +241,7 @@ option(YUZU_USE_BUNDLED_SIRIT "Download bundled sirit" ${BUNDLED_SIRIT_DEFAULT})
 # FreeBSD 15+ has libusb, versions below should disable it
 cmake_dependent_option(ENABLE_LIBUSB "Enable the use of LibUSB" ON "WIN32 OR LINUX OR FREEBSD OR APPLE" OFF)
 
-cmake_dependent_option(ENABLE_OPENGL "Enable OpenGL" ON "NOT (WIN32 AND ARCHITECTURE_arm64) AND NOT APPLE" OFF)
+cmake_dependent_option(ENABLE_OPENGL "Enable OpenGL" ON "NOT (WIN32 AND ARCHITECTURE_arm64) AND NOT APPLE AND NOT ANDROID" OFF)
 mark_as_advanced(FORCE ENABLE_OPENGL)
 
 option(ENABLE_WEB_SERVICE "Enable web services (telemetry, etc.)" ON)
@@ -512,7 +515,7 @@ endfunction()
 # =============================================
 
 if (APPLE)
-    foreach(fw Carbon Metal Cocoa IOKit CoreVideo CoreMedia Security UniformTypeIdentifiers)
+    foreach(fw Carbon Metal Cocoa IOKit CoreVideo CoreMedia Security UniformTypeIdentifiers Foundation)
         find_library(${fw}_LIBRARY ${fw} REQUIRED)
         list(APPEND PLATFORM_LIBRARIES ${${fw}_LIBRARY})
     endforeach()
@@ -540,7 +543,6 @@ add_subdirectory(externals)
 # pass targets from externals
 # TODO(crueter): CPMUtil Propagate func?
 find_package(enet)
-find_package(unordered_dense REQUIRED)
 
 if (ARCHITECTURE_x86 OR ARCHITECTURE_x86_64)
     find_package(xbyak)

@@ -6,11 +6,12 @@
 
 #pragma once
 
+#include <atomic>
 #include <optional>
 #include <set>
 #include <span>
 #include <string>
-#include <ankerl/unordered_dense.h>
+#include "common/container/unordered_map.h"
 #include <vector>
 
 #include "common/common_types.h"
@@ -74,6 +75,7 @@ VK_DEFINE_HANDLE(VmaAllocator)
     FEATURE(KHR, Maintenance6, MAINTENANCE_6, maintenance6)                                        \
     FEATURE(KHR, PipelineExecutableProperties, PIPELINE_EXECUTABLE_PROPERTIES,                     \
             pipeline_executable_properties)                                                        \
+    FEATURE(KHR, ShaderQuadControl, SHADER_QUAD_CONTROL, shader_quad_control)                      \
     FEATURE(KHR, WorkgroupMemoryExplicitLayout, WORKGROUP_MEMORY_EXPLICIT_LAYOUT,                  \
             workgroup_memory_explicit_layout)
 
@@ -91,6 +93,8 @@ VK_DEFINE_HANDLE(VmaAllocator)
     EXTENSION(EXT, SHADER_VIEWPORT_INDEX_LAYER, shader_viewport_index_layer)                       \
     EXTENSION(EXT, TOOLING_INFO, tooling_info)                                                     \
     EXTENSION(EXT, VERTEX_ATTRIBUTE_DIVISOR, vertex_attribute_divisor)                             \
+    EXTENSION(KHR, CREATE_RENDERPASS_2, create_renderpass2)                                        \
+    EXTENSION(KHR, DEPTH_STENCIL_RESOLVE, depth_stencil_resolve)                                   \
     EXTENSION(KHR, DRAW_INDIRECT_COUNT, draw_indirect_count)                                       \
     EXTENSION(KHR, DRIVER_PROPERTIES, driver_properties)                                           \
     EXTENSION(KHR, PUSH_DESCRIPTOR, push_descriptor)                                               \
@@ -269,6 +273,10 @@ public:
         return physical;
     }
 
+    VkPipelineCache StaticPipelineCache() const noexcept {
+        return *static_pipeline_cache;
+    }
+
     /// Returns the main graphics queue.
     vk::Queue GetGraphicsQueue() const {
         return graphics_queue;
@@ -307,6 +315,10 @@ public:
     /// Returns the driver ID.
     VkDriverIdKHR GetDriverID() const {
         return properties.driver.driverID;
+    }
+
+    bool IsSparseBindingSupported() const {
+        return features.features.sparseBinding && graphics_family_sparse_binding;
     }
 
     /// Returns true for tile-based deferred renderers.
@@ -583,6 +595,11 @@ FN_MAX_LIMIT_LIST
                features.features.shaderInt16;
     }
 
+    /// Returns true if the device supports VK_KHR_shader_quad_control.
+    bool IsKhrShaderQuadControlSupported() const {
+        return extensions.shader_quad_control && features.shader_quad_control.shaderQuadControl;
+    }
+
     /// Returns true if the device supports VK_KHR_image_format_list.
     bool IsKhrImageFormatListSupported() const {
         return extensions.image_format_list || instance_version >= VK_API_VERSION_1_2;
@@ -611,6 +628,32 @@ FN_MAX_LIMIT_LIST
     /// Returns true if the device supports VK_EXT_shader_stencil_export.
     bool IsExtShaderStencilExportSupported() const {
         return extensions.shader_stencil_export;
+    }
+
+    /// Returns true if the device supports VK_KHR_create_renderpass2.
+    bool IsKhrCreateRenderPass2Supported() const {
+        return extensions.create_renderpass2 || instance_version >= VK_API_VERSION_1_2;
+    }
+
+    /// Returns true if the device supports VK_KHR_depth_stencil_resolve.
+    bool IsKhrDepthStencilResolveSupported() const {
+        return (extensions.depth_stencil_resolve || instance_version >= VK_API_VERSION_1_2) &&
+               IsKhrCreateRenderPass2Supported();
+    }
+
+    /// Returns the supported resolve modes for the depth aspect.
+    VkResolveModeFlags GetDepthResolveModes() const {
+        return properties.depth_stencil_resolve.supportedDepthResolveModes;
+    }
+
+    /// Returns the supported resolve modes for the stencil aspect.
+    VkResolveModeFlags GetStencilResolveModes() const {
+        return properties.depth_stencil_resolve.supportedStencilResolveModes;
+    }
+
+    /// Returns true if only one of the depth and stencil aspects may be resolved.
+    bool SupportsIndependentResolveNone() const {
+        return properties.depth_stencil_resolve.independentResolveNone == VK_TRUE;
     }
 
     /// Returns true if depth/stencil operations can be performed efficiently.
@@ -671,20 +714,18 @@ FN_MAX_LIMIT_LIST
         return features.transform_feedback.geometryStreams;
     }
 
-    /// Returns true if the device supports VK_EXT_custom_border_color.
-    bool IsExtCustomBorderColorSupported() const {
-        return extensions.custom_border_color;
+    /// Returns true if custom border colors can be created without a format.
+    bool IsCustomBorderColorUsable() const {
+        return extensions.custom_border_color &&
+               features.custom_border_color.customBorderColors &&
+               features.custom_border_color.customBorderColorWithoutFormat;
     }
 
-    /// Returns true if customBorderColors feature is available.
-    bool IsCustomBorderColorsSupported() const {
-        return features.custom_border_color.customBorderColors;
-    }
+    /// Takes budget for samplers carrying a custom border color, false when exhausted.
+    bool TryReserveCustomBorderColorSamplers(size_t count) const;
 
-    /// Returns true if customBorderColorWithoutFormat feature is available.
-    bool IsCustomBorderColorWithoutFormatSupported() const {
-        return features.custom_border_color.customBorderColorWithoutFormat;
-    }
+    /// Gives back budget taken by TryReserveCustomBorderColorSamplers.
+    void ReleaseCustomBorderColorSamplers(size_t count) const;
 
     /// Returns true if the device supports VK_EXT_color_write_enable.
     bool IsExtColorWriteEnableSupported() const {
@@ -694,6 +735,12 @@ FN_MAX_LIMIT_LIST
     /// Returns true if the device supports VK_EXT_border_color_swizzle.
     bool IsExtBorderColorSwizzleSupported() const {
         return extensions.border_color_swizzle;
+    }
+
+    /// Returns true if samplers must be carried with border color swizzle mapping.
+    bool NeedsBorderColorSwizzleMapping() const {
+        return extensions.border_color_swizzle &&
+               !features.border_color_swizzle.borderColorSwizzleFromImage;
     }
 
     /// Returns true if borderColorSwizzleFromImage is available.
@@ -891,8 +938,6 @@ FN_MAX_LIMIT_LIST
         return has_broken_parallel_compiling;
     }
 
-    std::optional<size_t> GetSamplerHeapBudget() const;
-
     /// Returns the vendor name reported from Vulkan.
     std::string_view GetVendorName() const {
         return properties.driver.driverName;
@@ -919,10 +964,6 @@ FN_MAX_LIMIT_LIST
 
     bool SupportsD24DepthBuffer() const {
         return supports_d24_depth;
-    }
-
-    bool CantBlitMSAA() const {
-        return cant_blit_msaa;
     }
 
     bool MustEmulateScaledFormats() const {
@@ -1094,6 +1135,9 @@ private:
     /// Returns true if the device natively supports blitting depth stencil images.
     bool TestDepthStencilBlits(VkFormat format) const;
 
+    void LoadStaticPipelineCache();
+    void SaveStaticPipelineCache() const;
+
 private:
     VkInstance instance;         ///< Vulkan instance.
     VmaAllocator allocator;      ///< VMA allocator.
@@ -1102,9 +1146,12 @@ private:
     vk::Device logical;          ///< Logical device.
     vk::Queue graphics_queue;    ///< Main graphics queue.
     vk::Queue present_queue;     ///< Main present queue.
+    vk::PipelineCache static_pipeline_cache;
+    bool owns_static_pipeline_cache{};
     u32 instance_version{};      ///< Vulkan instance version.
     u32 graphics_family{};       ///< Main graphics queue family index.
     u32 present_family{};        ///< Main present queue family index.
+    bool graphics_family_sparse_binding{};
 
     struct Extensions {
 #define EXTENSION(prefix, macro_name, var_name) bool var_name{};
@@ -1148,6 +1195,8 @@ private:
         VkPhysicalDeviceSubgroupSizeControlProperties subgroup_size_control{};
         VkPhysicalDeviceTransformFeedbackPropertiesEXT transform_feedback{};
         VkPhysicalDeviceMaintenance5PropertiesKHR maintenance5{};
+        VkPhysicalDeviceDepthStencilResolveProperties depth_stencil_resolve{};
+        VkPhysicalDeviceCustomBorderColorPropertiesEXT custom_border_color{};
 
         VkPhysicalDeviceProperties properties{};
     };
@@ -1175,7 +1224,6 @@ private:
     bool has_nsight_graphics{};                ///< Has Nsight Graphics attached
     bool has_radeon_gpu_profiler{};            ///< Has Radeon GPU Profiler attached.
     bool supports_d24_depth{};                 ///< Supports D24 depth buffers.
-    bool cant_blit_msaa{};                     ///< Does not support MSAA<->MSAA blitting.
     bool must_emulate_scaled_formats{};        ///< Requires scaled vertex format emulation
     bool dynamic_state3_blending{};            ///< Has blending features of dynamic_state3.
     bool dynamic_state3_enables{};             ///< Has at least one enable feature of dynamic_state3.
@@ -1187,7 +1235,7 @@ private:
     bool dynamic_state3_alpha_to_coverage{};
     bool dynamic_state3_alpha_to_one{};
     bool supports_conditional_barriers{};      ///< Allows barriers in conditional control flow.
-    size_t sampler_heap_budget{};              ///< Sampler budget for buggy drivers (0 = unlimited).
+    mutable std::atomic<size_t> custom_border_color_samplers_used{};
     u64 device_access_memory{};                ///< Total size of device local memory in bytes.
     u32 sets_per_pool{};                       ///< Sets per Description Pool
     NvidiaArchitecture nvidia_arch{NvidiaArchitecture::Arch_AmpereOrNewer};
@@ -1198,7 +1246,7 @@ private:
     std::vector<size_t> valid_heap_memory;                   ///< Heaps used.
 
     /// Format properties dictionary.
-    ankerl::unordered_dense::map<VkFormat, VkFormatProperties> format_properties;
+    ::Common::unordered_map<VkFormat, VkFormatProperties> format_properties;
 
     /// Nsight Aftermath GPU crash tracker
     std::unique_ptr<NsightAftermathTracker> nsight_aftermath_tracker;
