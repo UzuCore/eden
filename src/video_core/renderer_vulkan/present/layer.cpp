@@ -94,11 +94,14 @@ void Layer::ConfigureDraw(const Device& device, PresentPushConstants* out_push_c
     const u32 scaled_width = texture_info ? texture_info->scaled_width : texture_width;
     const u32 scaled_height = texture_info ? texture_info->scaled_height : texture_height;
     const bool use_accelerated = texture_info.has_value();
+    const bool is_applet =
+        (framebuffer.layer_stack_mask & Service::Nvnflinger::LayerStackBit(
+                                            Service::Nvnflinger::LayerStackId::Recording)) == 0;
 
     RefreshResources(device, framebuffer);
     SetAntiAliasPass(device);
 #ifdef HAS_RESHADE
-    SetPostProcessPass(device);
+    SetPostProcessPass(device, is_applet);
 #endif
 
     // Finish any pending renderpass
@@ -138,8 +141,11 @@ void Layer::ConfigureDraw(const Device& device, PresentPushConstants* out_push_c
         source_image_view = fsr->Draw(device, scheduler, image_index, source_image, source_image_view, render_extent, crop_rect);
         crop_rect = {0, 0, 1, 1};
     } else if (auto* sgsr = std::get_if<SGSR>(&sr_filter)) {
-        source_image_view = sgsr->Draw(device, scheduler, image_index, source_image, source_image_view, render_extent, crop_rect);
-        crop_rect = {0, 0, 1, 1};
+        if (!is_applet) {
+            source_image_view = sgsr->Draw(device, scheduler, image_index, source_image,
+                                           source_image_view, render_extent, crop_rect);
+            crop_rect = {0, 0, 1, 1};
+        }
     }
 
     SetMatrixData(device, *out_push_constants, layout);
@@ -228,7 +234,11 @@ void Layer::SetAntiAliasPass(const Device& device) {
 }
 
 #ifdef HAS_RESHADE
-void Layer::SetPostProcessPass(const Device& device) {
+void Layer::SetPostProcessPass(const Device& device, bool is_applet) {
+    if (is_applet) {
+        post_process.reset();
+        return;
+    }
     const VkExtent2D render_area{
         .width = Settings::values.resolution_info.ScaleUp(raw_width),
         .height = Settings::values.resolution_info.ScaleUp(raw_height),
