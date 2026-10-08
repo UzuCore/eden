@@ -194,6 +194,14 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
     INSERT(Settings, skip_cpu_inner_invalidation, tr("Skip CPU Inner Invalidation"),
            tr("Skips certain cache invalidations during memory updates, reducing CPU usage and "
               "improving latency. This may cause soft-crashes."));
+    INSERT(Settings, nce_invalidation_gpu_readback,
+           tr("GPU Readback Before NCE Invalidation"),
+           tr("Flushes GPU buffer data back to guest memory before NCE invalidates the whole "
+              "guest page, preserving it while the CPU store proceeds."));
+    INSERT(Settings, nce_runtime_nro_patch,
+           tr("Patch Runtime NROs for NCE"),
+           tr("Applies NCE code patches to runtime-loaded NRO modules."
+              "This is required for some games to run correctly."));
     INSERT(Settings, vsync_mode, tr("VSync Mode:"),
            tr("FIFO (VSync) does not drop frames or exhibit tearing but is limited by the screen "
               "refresh rate.\nFIFO Relaxed allows tearing as it recovers from a slow down.\n"
@@ -342,9 +350,6 @@ std::unique_ptr<TranslationMap> InitializeTranslations(QObject* parent) {
               "it bypasses such prompts and directly exits the emulation."));
     INSERT(UISettings, hide_mouse, tr("Hide mouse on inactivity"),
            tr("Hides the mouse after 2.5s of inactivity."));
-    INSERT(UISettings, controller_applet_disabled, tr("Disable controller applet"),
-           tr("Forcibly disables the use of the controller applet in emulated programs.\n"
-              "When a program attempts to open the controller applet, it is immediately closed."));
     INSERT(UISettings, check_for_updates, tr("Check for updates"),
            tr("Whether or not to check for updates upon startup."));
 
@@ -380,6 +385,7 @@ std::unique_ptr<ComboboxTranslationMap> ComboboxEnumeration(QObject* parent) {
                           {
                               PAIR(AppletMode, HLE, tr("Custom frontend")),
                               PAIR(AppletMode, LLE, tr("Real applet")),
+                              PAIR(AppletMode, Disabled, tr("Disabled")),
                           }});
 
     translations->insert({Settings::EnumMetadata<Settings::SpirvOptimizeMode>::Index(),
