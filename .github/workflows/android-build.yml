@@ -38,6 +38,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
+      - name: Install host shader compiler
+        run: sudo apt-get update && sudo apt-get install --yes glslang-tools
+
       - name: Build standard Android release
         run: ./.ci/android/build.sh --target standard --build-type Release
 
