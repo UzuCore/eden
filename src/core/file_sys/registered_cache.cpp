@@ -25,6 +25,7 @@
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/submission_package.h"
 #include "core/file_sys/vfs/vfs_concat.h"
+#include "core/file_sys/vfs/vfs_ncz.h"
 #include "core/loader/loader.h"
 
 namespace FileSys {
@@ -1418,8 +1419,12 @@ void ExternalContentProvider::ScanDirectory(const VirtualDir& dir) {
 
         if (extension == "nsp") {
             ProcessNSP(file);
+        } else if (extension == "nsz") {
+            ProcessNSZ(file);
         } else if (extension == "xci") {
             ProcessXCI(file);
+        } else if (extension == "xcz") {
+            ProcessXCZ(file);
         }
     }
 
@@ -1438,12 +1443,38 @@ void ExternalContentProvider::ProcessNSP(const VirtualFile& file) {
     AddExternalEntriesFromContainer(nsp, entries, versions, multi_version_entries);
 }
 
+void ExternalContentProvider::ProcessNSZ(const VirtualFile& file) {
+    // NSZ는 내부에 .ncz(압축 NCA) 파일들이 들어있는 NSP(PFS0) 컨테이너이다.
+
+    const auto nsp = OpenContainerAsNsp(file, Loader::FileType::NSP);
+    if (!nsp) {
+        LOG_WARNING(Service_FS, "Failed to open NSZ as container: {}", file->GetName());
+        return;
+    }
+
+    AddExternalEntriesFromContainer(nsp, entries, versions, multi_version_entries);
+}
+
 void ExternalContentProvider::ProcessXCI(const VirtualFile& file) {
     const auto nsp = OpenContainerAsNsp(file, Loader::FileType::XCI);
     if (!nsp) {
         return;
     }
 
+    AddExternalEntriesFromContainer(nsp, entries, versions, multi_version_entries);
+}
+
+void ExternalContentProvider::ProcessXCZ(const VirtualFile& file) {
+    // XCZ는 내부에 .ncz가 들어있는 XCI(HFS0) 컨테이너이다.
+    // XCI 처리와 동일한 흐름을 따라가면 secure 파티션이 NSP로 노출되어
+    // 내부의 .ncz까지 정상적으로 인식된다.
+    const auto nsp = OpenContainerAsNsp(file, Loader::FileType::XCI);
+    if (!nsp) {
+        LOG_WARNING(Service_FS, "Failed to open XCZ as container: {}", file->GetName());
+        return;
+    }
+
+    LOG_DEBUG(Service_FS, "Processing XCZ file: {}", file->GetName());
     AddExternalEntriesFromContainer(nsp, entries, versions, multi_version_entries);
 }
 

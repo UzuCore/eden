@@ -19,6 +19,7 @@
 #include "core/file_sys/program_metadata.h"
 #include "core/file_sys/submission_package.h"
 #include "core/loader/loader.h"
+#include "core/file_sys/vfs/vfs_ncz.h"
 
 namespace FileSys {
 
@@ -220,12 +221,33 @@ void NSP::InitializeExeFSAndRomFS(const std::vector<VirtualFile>& files) {
 
 void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
     for (const auto& outer_file : files) {
-        if (outer_file->GetName().size() < 9 ||
-            outer_file->GetName().substr(outer_file->GetName().size() - 9) != ".cnmt.nca") {
+        const auto& outer_name = outer_file->GetName();
+
+        // cnmt 파일은 두 가지 형태로 존재 가능:
+        //   - "<hash>.cnmt.nca" : 일반 NSP 및 cnmt를 압축하지 않는 NSZ
+        //   - "<hash>.cnmt.ncz" : cnmt까지 압축한 NSZ (대부분의 nsz 도구 기본 동작)
+        // 둘 다 처리하지 않으면 NSZ에서 메타데이터를 읽지 못해 외부 콘텐츠(DLC/업데이트)가
+        // 등록되지 않는다.
+        const bool is_cnmt_nca = outer_name.size() >= 9 &&
+                                 outer_name.substr(outer_name.size() - 9) == ".cnmt.nca";
+        const bool is_cnmt_ncz = outer_name.size() >= 9 &&
+                                 outer_name.substr(outer_name.size() - 9) == ".cnmt.ncz";
+
+        if (!is_cnmt_nca && !is_cnmt_ncz) {
             continue;
         }
 
-        const auto nca = std::make_shared<NCA>(outer_file);
+        // .cnmt.ncz라면 NCA로 풀어준다.
+        auto cnmt_nca_file = outer_file;
+        if (is_cnmt_ncz) {
+            cnmt_nca_file = WrapNszAsNca(cnmt_nca_file);
+            if (cnmt_nca_file == nullptr) {
+                LOG_ERROR(Service_FS, "Failed to decompress NCZ metadata: {}", outer_name);
+                continue;
+            }
+        }
+
+        const auto nca = std::make_shared<NCA>(cnmt_nca_file);
         if (nca->GetStatus() != Loader::ResultStatus::Success || nca->GetSubdirectories().empty()) {
             program_status[nca->GetTitleId()] = nca->GetStatus();
             continue;
@@ -245,6 +267,18 @@ void NSP::ReadNCAs(const std::vector<VirtualFile>& files) {
             for (const auto& rec : cnmt.GetContentRecords()) {
                 const auto id_string = Common::HexToString(rec.nca_id, false);
                 auto next_file = pfs->GetFile(fmt::format("{}.nca", id_string));
+
+                if (next_file == nullptr) {
+                    auto ncz_file = pfs->GetFile(fmt::format("{}.ncz", id_string));
+                    if (ncz_file != nullptr) {
+                        next_file = WrapNszAsNca(std::move(ncz_file));
+                        if (next_file == nullptr) {
+                            LOG_ERROR(Service_FS, "NSZ: Failed to load {}.ncz - unsupported format",
+                                      id_string);
+                            continue;
+                        }
+                    }
+                }
 
                 if (next_file == nullptr) {
                     if (rec.type != ContentRecordType::DeltaFragment) {

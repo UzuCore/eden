@@ -312,7 +312,9 @@ public:
 private:
     void ScanDirectory(const VirtualDir& dir);
     void ProcessNSP(const VirtualFile& file);
+    void ProcessNSZ(const VirtualFile& file);
     void ProcessXCI(const VirtualFile& file);
+    void ProcessXCZ(const VirtualFile& file);
 
     std::vector<VirtualDir> load_dirs;
     ::Common::unordered_map<std::tuple<u64, ContentRecordType, TitleType>, VirtualFile> entries;
