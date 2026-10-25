@@ -1,0 +1,193 @@
+name: Build release assets
+
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Exact source commit selected by the manual dispatcher
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android APK and AAB
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            src/android/**/*.gradle*
+            src/android/**/gradle-wrapper.properties
+            src/android/gradle.properties
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+
+      - name: Install host shader compiler
+        run: sudo apt-get update && sudo apt-get install --yes glslang-tools
+
+      - name: Build standard Android release
+        run: ./.ci/android/build.sh --target standard --build-type Release
+
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: eden-release-android-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            artifacts/*.apk
+            artifacts/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Linux x64 AppImage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    container:
+      image: ghcr.io/pkgforge-dev/archlinux:latest
+      options: --privileged --device /dev/fuse
+    env:
+      BUILD_ID: manual
+      DEVEL: 'true'
+      TARGET: amd64
+      COMPILER: gcc
+      PGO_TARGET: standard
+      FULL_ARCH: amd64-gcc-standard
+      ARTIFACT_REF: ${{ github.run_number }}
+      GITHUB_TAG: ${{ github.run_number }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Check out pinned Eden CI build helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: Eden-CI/Workflow
+          ref: 087e573ed6397e39eaa3465181352363b1b84c7a
+          path: ci-helper
+          persist-credentials: false
+
+      - name: Install Eden CI build helpers
+        run: |
+          mkdir -p .ci/deps
+          cp -a ci-helper/.ci/build .ci/build
+          cp -a ci-helper/.ci/package .ci/package
+          cp ci-helper/.ci/deps/arch.sh .ci/deps/arch.sh
+
+      - name: Install build dependencies
+        run: ./.ci/deps/arch.sh
+
+      - name: Configure
+        run: ./.ci/build/configure.sh
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package AppImage
+        run: ./.ci/package/linux.sh
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: eden-release-linux-${{ github.run_number }}-${{ github.run_attempt }}
+          path: artifacts/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows x64 ZIP
+    runs-on: windows-latest
+    timeout-minutes: 360
+    env:
+      BUILD_ID: manual
+      DEVEL: 'true'
+      TARGET: amd64
+      COMPILER: msvc
+      PGO_TARGET: standard
+      ARCH: amd64-msvc-standard
+      ARTIFACT_REF: ${{ github.run_number }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Check out pinned Eden CI build helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: Eden-CI/Workflow
+          ref: 087e573ed6397e39eaa3465181352363b1b84c7a
+          path: ci-helper
+          persist-credentials: false
+
+      - name: Install Eden CI build helpers
+        shell: bash
+        run: |
+          mkdir -p .ci/deps
+          cp -a ci-helper/.ci/build .ci/build
+          cp -a ci-helper/.ci/package .ci/package
+          cp ci-helper/.ci/deps/windows/install-vulkan-sdk.ps1 .ci/deps/install-vulkan-sdk.ps1
+
+      - name: Set up MSVC
+        uses: Eden-CI/msvc-dev-cmd@1bd71f95d6f3d1b2b3395b335cc63bcdc90cf223 # master
+        with:
+          arch: amd64
+
+      - name: Install LLVM/Clang
+        uses: Nerixyz/install-llvm-action@7372aab026498959cff47c82953ba378477d4b00 # feat/new-llvm-versions
+        with:
+          version: 22.1.4
+          env: true
+
+      - name: Add Clang to PATH
+        shell: bash
+        run: |
+          echo "${LLVM_PATH}/bin" >> "$GITHUB_PATH"
+          "${LLVM_PATH}/bin/clang-cl" --version
+
+      - name: Install Vulkan SDK
+        shell: powershell
+        run: ./.ci/deps/install-vulkan-sdk.ps1
+
+      - name: Configure
+        shell: bash
+        run: |
+          git config --global core.autocrlf off
+          ./.ci/build/configure.sh
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --parallel
+
+      - name: Package ZIP
+        shell: bash
+        run: ./.ci/package/windows.sh
+
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: eden-release-windows-${{ github.run_number }}-${{ github.run_attempt }}
+          path: artifacts/*.zip
+          if-no-files-found: error
+          retention-days: 14
