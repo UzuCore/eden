@@ -35,7 +35,7 @@ jobs:
           echo "build_date=$(TZ=Asia/Seoul date -d "$RUN_STARTED_AT" +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
   android:
-    name: Android APK and AAB
+    name: Android APK
     needs: resolve_source
     runs-on: ubuntu-24.04
     timeout-minutes: 240
@@ -67,13 +67,11 @@ jobs:
       - name: Build standard Android release
         run: ./.ci/android/build.sh --target standard --build-type Release
 
-      - name: Upload APK and AAB
+      - name: Upload APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: eden-release-android-${{ github.run_number }}-${{ github.run_attempt }}
-          path: |
-            artifacts/*.apk
-            artifacts/*.aab
+          path: artifacts/*.apk
           if-no-files-found: error
           retention-days: 14
 
