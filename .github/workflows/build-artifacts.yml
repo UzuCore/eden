@@ -67,6 +67,17 @@ jobs:
       - name: Build standard Android release
         run: ./.ci/android/build.sh --target standard --build-type Release
 
+      - name: Give APK a date-based name
+        env:
+          BUILD_DATE: ${{ needs.resolve_source.outputs.build_date }}
+        run: |
+          apks=(artifacts/*.apk)
+          if ((${#apks[@]} != 1)); then
+            echo "Expected one APK, found ${#apks[@]}" >&2
+            exit 1
+          fi
+          mv "${apks[0]}" "artifacts/Eden-Android-${BUILD_DATE}.apk"
+
       - name: Upload APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -90,8 +101,8 @@ jobs:
       COMPILER: gcc
       PGO_TARGET: standard
       FULL_ARCH: amd64-gcc-standard
-      ARTIFACT_REF: ${{ github.run_number }}
-      GITHUB_TAG: ${{ github.run_number }}
+      ARTIFACT_REF: ${{ needs.resolve_source.outputs.build_date }}
+      GITHUB_TAG: ${{ needs.resolve_source.outputs.build_date }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -145,7 +156,7 @@ jobs:
       COMPILER: msvc
       PGO_TARGET: standard
       ARCH: amd64-msvc-standard
-      ARTIFACT_REF: ${{ github.run_number }}
+      ARTIFACT_REF: ${{ needs.resolve_source.outputs.build_date }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -244,11 +255,25 @@ jobs:
             exit 1
           fi
 
-          tag="${BUILD_DATE}-${GITHUB_RUN_NUMBER}"
-          title="Eden ${BUILD_DATE} (build #${GITHUB_RUN_NUMBER})"
+          tag="${BUILD_DATE}"
+          title="Eden ${BUILD_DATE}"
           notes=$(printf 'All Android, Windows x64, and Linux x64 builds passed.\n\nSource commit: %s\n' "$SOURCE_SHA")
 
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" >/dev/null 2>&1; then
+              gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" \
+                -f sha="$SOURCE_SHA" -F force=true >/dev/null
+            else
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f ref="refs/tags/${tag}" -f sha="$SOURCE_SHA" >/dev/null
+            fi
+
+            while IFS= read -r old_asset; do
+              [ -z "$old_asset" ] || gh release delete-asset "$tag" "$old_asset" \
+                --yes --repo "$GITHUB_REPOSITORY"
+            done < <(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
             gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
           else
             gh release create "$tag" "${assets[@]}" \
