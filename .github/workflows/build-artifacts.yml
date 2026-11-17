@@ -1,0 +1,286 @@
+name: Build release assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch, tag, or commit to build
+        required: true
+        default: dev
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  resolve_source:
+    name: Resolve source and build date
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      build_date: ${{ steps.source.outputs.build_date }}
+    steps:
+      - name: Check out requested source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 1
+
+      - name: Resolve immutable build inputs
+        id: source
+        env:
+          RUN_STARTED_AT: ${{ github.run_started_at }}
+        run: |
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(TZ=Asia/Seoul date -d "$RUN_STARTED_AT" +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+  android:
+    name: Android APK
+    needs: resolve_source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve_source.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            src/android/**/*.gradle*
+            src/android/**/gradle-wrapper.properties
+            src/android/gradle.properties
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+
+      - name: Install host shader compiler
+        run: sudo apt-get update && sudo apt-get install --yes glslang-tools
+
+      - name: Build standard Android release
+        run: ./.ci/android/build.sh --target standard --build-type Release
+
+      - name: Give APK a date-based name
+        env:
+          BUILD_DATE: ${{ needs.resolve_source.outputs.build_date }}
+        run: |
+          apks=(artifacts/*.apk)
+          if ((${#apks[@]} != 1)); then
+            echo "Expected one APK, found ${#apks[@]}" >&2
+            exit 1
+          fi
+          mv "${apks[0]}" "artifacts/Eden-Android-${BUILD_DATE}.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: eden-release-android-${{ github.run_number }}-${{ github.run_attempt }}
+          path: artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Linux x64 AppImage
+    needs: resolve_source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    container:
+      image: ghcr.io/pkgforge-dev/archlinux:latest
+      options: --privileged --device /dev/fuse
+    env:
+      BUILD_ID: manual
+      DEVEL: 'true'
+      TARGET: amd64
+      COMPILER: gcc
+      PGO_TARGET: standard
+      FULL_ARCH: amd64-gcc-standard
+      ARTIFACT_REF: ${{ needs.resolve_source.outputs.build_date }}
+      GITHUB_TAG: ${{ needs.resolve_source.outputs.build_date }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve_source.outputs.source_sha }}
+
+      - name: Check out pinned Eden CI build helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: Eden-CI/Workflow
+          ref: 087e573ed6397e39eaa3465181352363b1b84c7a
+          path: ci-helper
+          persist-credentials: false
+
+      - name: Install Eden CI build helpers
+        run: |
+          mkdir -p .ci/deps
+          cp -a ci-helper/.ci/build .ci/build
+          cp -a ci-helper/.ci/package .ci/package
+          cp ci-helper/.ci/deps/arch.sh .ci/deps/arch.sh
+
+      - name: Install build dependencies
+        run: ./.ci/deps/arch.sh
+
+      - name: Configure
+        run: ./.ci/build/configure.sh
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package AppImage
+        run: ./.ci/package/linux.sh
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: eden-release-linux-${{ github.run_number }}-${{ github.run_attempt }}
+          path: artifacts/*.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Windows x64 ZIP
+    needs: resolve_source
+    runs-on: windows-latest
+    timeout-minutes: 360
+    env:
+      BUILD_ID: manual
+      DEVEL: 'true'
+      TARGET: amd64
+      COMPILER: msvc
+      PGO_TARGET: standard
+      ARCH: amd64-msvc-standard
+      ARTIFACT_REF: ${{ needs.resolve_source.outputs.build_date }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.resolve_source.outputs.source_sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Check out pinned Eden CI build helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: Eden-CI/Workflow
+          ref: 087e573ed6397e39eaa3465181352363b1b84c7a
+          path: ci-helper
+          persist-credentials: false
+
+      - name: Install Eden CI build helpers
+        shell: bash
+        run: |
+          mkdir -p .ci/deps
+          cp -a ci-helper/.ci/build .ci/build
+          cp -a ci-helper/.ci/package .ci/package
+          cp ci-helper/.ci/deps/windows/install-vulkan-sdk.ps1 .ci/deps/install-vulkan-sdk.ps1
+
+      - name: Set up MSVC
+        uses: Eden-CI/msvc-dev-cmd@1bd71f95d6f3d1b2b3395b335cc63bcdc90cf223 # master
+        with:
+          arch: amd64
+
+      - name: Install LLVM/Clang
+        uses: Nerixyz/install-llvm-action@7372aab026498959cff47c82953ba378477d4b00 # feat/new-llvm-versions
+        with:
+          version: 22.1.4
+          env: true
+
+      - name: Add Clang to PATH
+        shell: bash
+        run: |
+          echo "${LLVM_PATH}/bin" >> "$GITHUB_PATH"
+          "${LLVM_PATH}/bin/clang-cl" --version
+
+      - name: Install Vulkan SDK
+        shell: powershell
+        run: ./.ci/deps/install-vulkan-sdk.ps1
+
+      - name: Configure
+        shell: bash
+        run: |
+          git config --global core.autocrlf off
+          ./.ci/build/configure.sh
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --parallel
+
+      - name: Package ZIP
+        shell: bash
+        run: ./.ci/package/windows.sh
+
+      - name: Upload Windows ZIP
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: eden-release-windows-${{ github.run_number }}-${{ github.run_attempt }}
+          path: artifacts/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish date-tagged GitHub Release
+    needs:
+      - resolve_source
+      - android
+      - linux
+      - windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all platform builds
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: eden-release-*-${{ github.run_number }}-${{ github.run_attempt }}
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or update date-tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_DATE: ${{ needs.resolve_source.outputs.build_date }}
+          SOURCE_SHA: ${{ needs.resolve_source.outputs.source_sha }}
+        run: |
+          shopt -s nullglob
+          assets=(release-assets/*)
+          if ((${#assets[@]} == 0)); then
+            echo "No build assets were downloaded" >&2
+            exit 1
+          fi
+
+          tag="${BUILD_DATE}"
+          title="Eden ${BUILD_DATE}"
+          notes=$(printf 'All Android, Windows x64, and Linux x64 builds passed.\n\nSource commit: %s\n' "$SOURCE_SHA")
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" >/dev/null 2>&1; then
+              gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" \
+                -f sha="$SOURCE_SHA" -F force=true >/dev/null
+            else
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f ref="refs/tags/${tag}" -f sha="$SOURCE_SHA" >/dev/null
+            fi
+
+            while IFS= read -r old_asset; do
+              [ -z "$old_asset" ] || gh release delete-asset "$tag" "$old_asset" \
+                --yes --repo "$GITHUB_REPOSITORY"
+            done < <(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$title" --notes "$notes"
+            gh release upload "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" \
+              --title "$title" \
+              --notes "$notes"
+          fi
+
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY"
